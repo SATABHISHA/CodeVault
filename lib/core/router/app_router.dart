@@ -5,6 +5,9 @@ import 'package:codevault/features/dashboard/presentation/app_shell.dart';
 import 'package:codevault/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:codevault/features/settings/presentation/about_screen.dart';
 import 'package:codevault/features/support/presentation/support_screen.dart';
+import 'package:codevault/features/windows_desktop/presentation/operations_screen.dart';
+import 'package:codevault/features/windows_desktop/presentation/recovery_screen.dart';
+import 'package:codevault/features/windows_desktop/presentation/windows_entry_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -17,9 +20,22 @@ final appRouterProvider = Provider<GoRouter>(
         builder: (context, state) => const SplashScreen(),
       ),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(
+        path: '/windows',
+        builder: (context, state) => const WindowsEntryScreen(),
+      ),
+      GoRoute(
+        path: '/windows/recovery',
+        builder: (context, state) =>
+            OfflineRecoveryScreen(companyId: state.extra! as String),
+      ),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
+          GoRoute(
+            path: '/windows/operations',
+            builder: (context, state) => const WindowsOperationsScreen(),
+          ),
           GoRoute(
             path: '/dashboard',
             builder: (context, state) => const DashboardScreen(),

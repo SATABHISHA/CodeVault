@@ -1,0 +1,91 @@
+import 'package:flutter/material.dart';
+
+import '../../../shared/widgets/app_text_field.dart';
+import '../application/offline_recovery_service.dart';
+import '../data/local_database.dart';
+
+class OfflineRecoveryScreen extends StatefulWidget {
+  const OfflineRecoveryScreen({required this.companyId, super.key});
+  final String companyId;
+  @override
+  State<OfflineRecoveryScreen> createState() => _OfflineRecoveryScreenState();
+}
+
+class _OfflineRecoveryScreenState extends State<OfflineRecoveryScreen> {
+  final username = TextEditingController();
+  RecoveryChallenge? challenge;
+  String? error;
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Local Offline Recovery')),
+    body: Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Recovery codes are shown only on this computer, expire after five minutes, are single-use, and have an attempt limit.',
+                ),
+                const SizedBox(height: 18),
+                AppTextField(
+                  label: 'Local admin username',
+                  controller: username,
+                ),
+                const SizedBox(height: 18),
+                FilledButton(
+                  key: const Key('confirm-offline-recovery'),
+                  onPressed: _create,
+                  child: const Text('I confirm local account recovery'),
+                ),
+                if (challenge != null) ...[
+                  const SizedBox(height: 20),
+                  Text(
+                    challenge!.code,
+                    key: const Key('recovery-code'),
+                    style: Theme.of(context).textTheme.displaySmall,
+                  ),
+                  Text('Expires ${challenge!.expiresAt.toLocal()}'),
+                  const Text(
+                    'Use this code once to reset the selected administrator password. A password change will be mandatory.',
+                  ),
+                ],
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      error!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  Future<void> _create() async {
+    final database = LocalDatabase(widget.companyId);
+    try {
+      final value = await OfflineRecoveryService(
+        database,
+      ).create(username.text, confirmed: true);
+      if (mounted) {
+        setState(() {
+          challenge = value;
+          error = null;
+        });
+      }
+    } catch (exception) {
+      if (mounted) setState(() => error = exception.toString());
+    } finally {
+      await database.close();
+    }
+  }
+}

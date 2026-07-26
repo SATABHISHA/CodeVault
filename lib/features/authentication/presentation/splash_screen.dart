@@ -1,4 +1,5 @@
 import 'package:codevault/core/config/brand_config.dart';
+import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,7 +14,11 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     Future<void>.delayed(const Duration(milliseconds: 450), () {
-      if (mounted) context.go('/login');
+      if (mounted) {
+        context.go(
+          PlatformCapabilities.current().isWindows ? '/windows' : '/login',
+        );
+      }
     });
   }
 

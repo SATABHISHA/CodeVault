@@ -1,5 +1,6 @@
 import 'package:codevault/core/config/brand_config.dart';
 import 'package:codevault/core/layout/breakpoints.dart';
+import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,7 +8,7 @@ class AppShell extends StatelessWidget {
   const AppShell({required this.child, this.locationOverride, super.key});
   final Widget child;
   final String? locationOverride;
-  static const destinations = [
+  static const cloudDestinations = [
     (Icons.dashboard_outlined, 'Dashboard', '/dashboard'),
     (Icons.backup_outlined, 'Backup', '/backup'),
     (Icons.support_agent_outlined, 'Support', '/support'),
@@ -16,6 +17,14 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final destinations = PlatformCapabilities.current().isWindows
+        ? const [
+            (Icons.print_outlined, 'Operations', '/windows/operations'),
+            (Icons.backup_outlined, 'Local backup', '/backup'),
+            (Icons.support_agent_outlined, 'Support', '/support'),
+            (Icons.info_outline, 'About', '/about'),
+          ]
+        : cloudDestinations;
     final size = layoutSizeFor(MediaQuery.sizeOf(context).width);
     final location = locationOverride ?? GoRouterState.of(context).uri.path;
     final selected = destinations
