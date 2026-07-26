@@ -10,6 +10,8 @@ class AppShell extends StatelessWidget {
   final String? locationOverride;
   static const cloudDestinations = [
     (Icons.dashboard_outlined, 'Dashboard', '/dashboard'),
+    (Icons.print_outlined, 'Print', '/web/print'),
+    (Icons.sync_outlined, 'Sync', '/sync'),
     (Icons.backup_outlined, 'Backup', '/backup'),
     (Icons.support_agent_outlined, 'Support', '/support'),
     (Icons.info_outline, 'About', '/about'),
@@ -22,6 +24,14 @@ class AppShell extends StatelessWidget {
             (Icons.print_outlined, 'Operations', '/windows/operations'),
             (Icons.backup_outlined, 'Local backup', '/backup'),
             (Icons.support_agent_outlined, 'Support', '/support'),
+            (Icons.info_outline, 'About', '/about'),
+          ]
+        : PlatformCapabilities.current().isAndroid
+        ? const [
+            (Icons.dashboard_outlined, 'Dashboard', '/dashboard'),
+            (Icons.print_outlined, 'Printers', '/printers'),
+            (Icons.sync_outlined, 'Sync', '/sync'),
+            (Icons.backup_outlined, 'Backup', '/backup'),
             (Icons.info_outline, 'About', '/about'),
           ]
         : cloudDestinations;

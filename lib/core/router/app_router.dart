@@ -5,6 +5,9 @@ import 'package:codevault/features/dashboard/presentation/app_shell.dart';
 import 'package:codevault/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:codevault/features/settings/presentation/about_screen.dart';
 import 'package:codevault/features/support/presentation/support_screen.dart';
+import 'package:codevault/features/printers/presentation/android_printer_screen.dart';
+import 'package:codevault/features/printers/presentation/web_print_screen.dart';
+import 'package:codevault/features/sync/presentation/sync_status_screen.dart';
 import 'package:codevault/features/windows_desktop/presentation/operations_screen.dart';
 import 'package:codevault/features/windows_desktop/presentation/recovery_screen.dart';
 import 'package:codevault/features/windows_desktop/presentation/windows_entry_screen.dart';
@@ -33,6 +36,18 @@ final appRouterProvider = Provider<GoRouter>(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
           GoRoute(
+            path: '/printers',
+            builder: (context, state) => const AndroidPrinterScreen(),
+          ),
+          GoRoute(
+            path: '/web/print',
+            builder: (context, state) => const WebPrintScreen(),
+          ),
+          GoRoute(
+            path: '/sync',
+            builder: (context, state) => const SyncStatusScreen(),
+          ),
+          GoRoute(
             path: '/windows/operations',
             builder: (context, state) => const WindowsOperationsScreen(),
           ),
@@ -42,7 +57,7 @@ final appRouterProvider = Provider<GoRouter>(
           ),
           GoRoute(
             path: '/backup',
-            builder: (context, state) => const BackupScreen(),
+            builder: (context, state) => const PermissionAwareBackupScreen(),
           ),
           GoRoute(
             path: '/support',

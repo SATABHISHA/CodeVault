@@ -2,10 +2,18 @@ import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:codevault/shared/widgets/animated_request_dialog.dart';
 import 'package:codevault/shared/widgets/empty_state.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../authentication/presentation/session_controller.dart';
+import '../data/managed_request_service.dart';
+import '../../../core/network/api_client.dart';
+import 'web_cache_transfer_card.dart';
 
 class BackupScreen extends StatelessWidget {
-  const BackupScreen({super.key, this.capabilities});
+  const BackupScreen({super.key, this.capabilities, this.permissions});
   final PlatformCapabilities? capabilities;
+  final Set<String>? permissions;
   @override
   Widget build(BuildContext context) {
     final platform = capabilities ?? PlatformCapabilities.current();
@@ -33,6 +41,9 @@ class BackupScreen extends StatelessWidget {
             label: const Text('Create local backup'),
           ),
         ] else if (platform.supportsManagedCloudRequests) ...[
+          if (platform.isWeb && permissions != null)
+            WebCacheTransferCard(tenantId: _tenantId(context)),
+          if (platform.isWeb && permissions != null) const SizedBox(height: 16),
           const EmptyState(
             icon: Icons.cloud_queue,
             title: 'Managed Laravel backup',
@@ -44,24 +55,38 @@ class BackupScreen extends StatelessWidget {
             spacing: 12,
             runSpacing: 12,
             children: [
-              FilledButton.icon(
-                key: const Key('request-backup'),
-                onPressed: () => showAnimatedRequestDialog(
-                  context,
-                  type: RequestType.backup,
+              if (permissions == null ||
+                  permissions!.contains('backup_requests.create'))
+                FilledButton.icon(
+                  key: const Key('request-backup'),
+                  onPressed: () => showAnimatedRequestDialog(
+                    context,
+                    type: RequestType.backup,
+                    onSubmit: (input) => _submitManaged(context, input),
+                    platform: platform.isWeb ? 'web' : 'android',
+                    deviceName: platform.isWeb
+                        ? 'CodeVault Web Browser'
+                        : 'CodeVault Android',
+                  ),
+                  icon: const Icon(Icons.backup_outlined),
+                  label: const Text('Request backup'),
                 ),
-                icon: const Icon(Icons.backup_outlined),
-                label: const Text('Request backup'),
-              ),
-              OutlinedButton.icon(
-                key: const Key('request-restore'),
-                onPressed: () => showAnimatedRequestDialog(
-                  context,
-                  type: RequestType.restore,
+              if (permissions == null ||
+                  permissions!.contains('restore_requests.create'))
+                OutlinedButton.icon(
+                  key: const Key('request-restore'),
+                  onPressed: () => showAnimatedRequestDialog(
+                    context,
+                    type: RequestType.restore,
+                    onSubmit: (input) => _submitManaged(context, input),
+                    platform: platform.isWeb ? 'web' : 'android',
+                    deviceName: platform.isWeb
+                        ? 'CodeVault Web Browser'
+                        : 'CodeVault Android',
+                  ),
+                  icon: const Icon(Icons.restore),
+                  label: const Text('Request restore'),
                 ),
-                icon: const Icon(Icons.restore),
-                label: const Text('Request restore'),
-              ),
             ],
           ),
         ] else
@@ -73,4 +98,35 @@ class BackupScreen extends StatelessWidget {
       ],
     );
   }
+
+  Future<void> _submitManaged(
+    BuildContext context,
+    ManagedRequestInput input,
+  ) async {
+    final container = ProviderScope.containerOf(context, listen: false);
+    final tenantId = container.read(sessionProvider).tenantId;
+    if (tenantId == null) throw StateError('Tenant session is required.');
+    await ManagedRequestService(
+      ApiClient(
+        onSessionExpired: () async {
+          container.read(sessionProvider.notifier).signOut();
+          if (context.mounted) context.go('/login');
+        },
+      ),
+    ).submit(tenantId, input);
+  }
+
+  String _tenantId(BuildContext context) =>
+      ProviderScope.containerOf(
+        context,
+        listen: false,
+      ).read(sessionProvider).tenantId ??
+      (throw StateError('Tenant session is required.'));
+}
+
+class PermissionAwareBackupScreen extends ConsumerWidget {
+  const PermissionAwareBackupScreen({super.key});
+  @override
+  Widget build(BuildContext context, WidgetRef ref) =>
+      BackupScreen(permissions: ref.watch(sessionProvider).permissions);
 }

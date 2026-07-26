@@ -1,10 +1,10 @@
 import 'package:codevault/core/config/api_environment.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../security/token_store.dart';
 
 class ApiClient {
-  ApiClient({Dio? dio, FlutterSecureStorage? storage})
-    : _storage = storage ?? const FlutterSecureStorage(),
+  ApiClient({Dio? dio, TokenStore? tokenStore, this.onSessionExpired})
+    : _tokenStore = tokenStore ?? const SecureTokenStore(),
       dio =
           dio ??
           Dio(
@@ -17,15 +17,23 @@ class ApiClient {
     this.dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
-          final token = await _storage.read(key: 'access_token');
+          final token = await _tokenStore.read();
           if (token != null) options.headers['Authorization'] = 'Bearer $token';
           options.headers['Accept'] = 'application/json';
           handler.next(options);
+        },
+        onError: (error, handler) async {
+          if (error.response?.statusCode == 401) {
+            await _tokenStore.delete();
+            await onSessionExpired?.call();
+          }
+          handler.next(error);
         },
       ),
     );
   }
 
   final Dio dio;
-  final FlutterSecureStorage _storage;
+  final TokenStore _tokenStore;
+  final Future<void> Function()? onSessionExpired;
 }
