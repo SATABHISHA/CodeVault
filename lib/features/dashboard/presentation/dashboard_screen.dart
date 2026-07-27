@@ -418,7 +418,7 @@ class _Metric extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Card(
     child: Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           Container(
@@ -442,7 +442,12 @@ class _Metric extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                Text(detail, style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  detail,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),

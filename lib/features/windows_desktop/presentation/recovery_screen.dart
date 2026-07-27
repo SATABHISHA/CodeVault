@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../shared/widgets/animated_login_background.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../application/offline_recovery_service.dart';
 import '../data/local_database.dart';
@@ -20,11 +21,15 @@ class _OfflineRecoveryScreenState extends State<OfflineRecoveryScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Local Offline Recovery')),
-    body: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
-        child: Card(
-          child: Padding(
+    body: Stack(
+      children: [
+        const Positioned.fill(child: AnimatedLoginBackground(busy: false)),
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Card(
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: .94),
+              child: Padding(
             padding: const EdgeInsets.all(28),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -85,6 +90,8 @@ class _OfflineRecoveryScreenState extends State<OfflineRecoveryScreen> {
         ),
       ),
     ),
+  ],
+  ),
   );
   Future<void> _create() async {
     final database = LocalDatabase(widget.companyId);

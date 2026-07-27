@@ -1,9 +1,11 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/config/brand_config.dart';
 import '../../../platform/windows/data/bootstrap_store.dart';
+import '../../../shared/widgets/animated_login_background.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../application/local_account_service.dart';
 import '../application/windows_session.dart';
@@ -57,7 +59,7 @@ class FirstRunSetupScreen extends StatefulWidget {
   State<FirstRunSetupScreen> createState() => _FirstRunSetupScreenState();
 }
 
-class _FirstRunSetupScreenState extends State<FirstRunSetupScreen> {
+class _FirstRunSetupScreenState extends State<FirstRunSetupScreen> with SingleTickerProviderStateMixin {
   final company = TextEditingController();
   final address = TextEditingController();
   final email = TextEditingController();
@@ -67,27 +69,136 @@ class _FirstRunSetupScreenState extends State<FirstRunSetupScreen> {
   final password = TextEditingController();
   bool busy = false;
   String? error;
+  late final AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    company.dispose();
+    address.dispose();
+    email.dispose();
+    phone.dispose();
+    username.dispose();
+    name.dispose();
+    password.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: Center(
-      child: SingleChildScrollView(
+    body: Stack(
+      children: [
+        Positioned.fill(child: AnimatedLoginBackground(busy: busy)),
+        Center(
+          child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Set up CodeVault',
-                    style: Theme.of(context).textTheme.headlineMedium,
-                  ),
-                  const Text(
-                    'Creates an authoritative local company database. No internet or Laravel login is used.',
-                  ),
-                  const SizedBox(height: 24),
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              gradient: const LinearGradient(
+                colors: [Colors.blueAccent, Colors.purpleAccent, Colors.pinkAccent],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.purpleAccent.withValues(alpha: 0.3),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(2),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  color: Theme.of(context).colorScheme.surface.withValues(alpha: .85),
+                  padding: const EdgeInsets.all(42),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'CodeVault',
+                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -1.0,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Text(
+                            'by ',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          AnimatedBuilder(
+                            animation: _pulseController,
+                            builder: (context, child) {
+                              return ShaderMask(
+                                shaderCallback: (bounds) {
+                                  return LinearGradient(
+                                    colors: const [
+                                      Colors.blueAccent,
+                                      Colors.purpleAccent,
+                                      Colors.pinkAccent,
+                                      Colors.deepOrangeAccent,
+                                      Colors.blueAccent,
+                                    ],
+                                    stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+                                    transform: GradientRotation(_pulseController.value * 2 * 3.1415926535),
+                                  ).createShader(bounds);
+                                },
+                                child: const Text(
+                                  'Ahanova AI Technologies Pvt Ltd',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.email_outlined, size: 16, color: Colors.grey),
+                          const SizedBox(width: 8),
+                          Text(
+                            'wecare@ahanova.in',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey,
+                                ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Setup your authoritative local company database. No internet or Laravel login is used.',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 32),
                   Wrap(
                     spacing: 16,
                     runSpacing: 16,
@@ -160,16 +271,18 @@ class _FirstRunSetupScreenState extends State<FirstRunSetupScreen> {
                       busy ? 'Initializing…' : 'Create local company',
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(BrandConfig.poweredBy),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
+                  ],
+                ),
+              ), // Container
+              ), // BackdropFilter
+            ), // ClipRRect
+          ), // Container (outer gradient)
+        ), // ConstrainedBox
+      ), // SingleChildScrollView
+    ), // Center
+  ],
+),
+);
   Future<void> _submit() async {
     setState(() {
       busy = true;
@@ -215,79 +328,178 @@ class _LocalLoginScreenState extends State<LocalLoginScreen> {
   bool busy = false;
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF160C38), Color(0xFF153C6B), Color(0xFF007F87)],
-        ),
-      ),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: Card(
-            elevation: 24,
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TweenAnimationBuilder<double>(
-                    duration: const Duration(milliseconds: 650),
-                    tween: Tween(begin: .7, end: 1),
-                    builder: (_, value, child) =>
-                        Transform.scale(scale: value, child: child),
-                    child: const CircleAvatar(
-                      radius: 36,
-                      child: Icon(Icons.qr_code_2_rounded, size: 44),
-                    ),
-                  ),
-                  Text(
-                    'Local offline login',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const Text('Secure offline workspace • SQLite protected'),
-                  const SizedBox(height: 24),
-                  AppTextField(label: 'Username', controller: username),
-                  const SizedBox(height: 16),
-                  AppTextField(
-                    label: 'Password',
-                    controller: password,
-                    obscureText: true,
-                  ),
-                  if (error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Text(
-                        error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+    body: Stack(
+      children: [
+        Positioned.fill(child: AnimatedLoginBackground(busy: busy)),
+        Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1060),
+              child: Card(
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: .94),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final welcome = Container(
+                        padding: const EdgeInsets.all(42),
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF7357FF), Color(0xFF00AFC8)],
+                          ),
                         ),
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      key: const Key('local-login'),
-                      onPressed: busy ? null : _login,
-                      child: const Text('Open local dashboard'),
-                    ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.qr_code_2_rounded,
+                              color: Colors.white,
+                              size: 58,
+                            ),
+                            SizedBox(height: 30),
+                            Text(
+                              'Industrial labels, beautifully controlled.',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w900,
+                                height: 1.15,
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Manage part masters, generate production codes, preview exact label sizes and print across Windows, web and Android.',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 16,
+                                height: 1.5,
+                              ),
+                            ),
+                            SizedBox(height: 28),
+                            Wrap(
+                              spacing: 18,
+                              runSpacing: 12,
+                              children: [
+                                FeatureWidget(
+                                  icon: Icons.offline_bolt,
+                                  label: 'Offline ready',
+                                ),
+                                FeatureWidget(
+                                  icon: Icons.sync,
+                                  label: 'Secure sync',
+                                ),
+                                FeatureWidget(
+                                  icon: Icons.print,
+                                  label: 'Multi-printer',
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                      final form = Padding(
+                        padding: const EdgeInsets.all(38),
+                        child: AutofillGroup(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                BrandConfig.productName,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(fontWeight: FontWeight.w900),
+                              ),
+                              const SizedBox(height: 6),
+                              const Text(
+                                'Welcome back. Sign in to your workspace.',
+                              ),
+                              const SizedBox(height: 28),
+                              AppTextField(
+                                label: 'Username or email',
+                                icon: Icons.person_outline,
+                                controller: username,
+                                autofillHints: const [AutofillHints.username],
+                              ),
+                              const SizedBox(height: 15),
+                              AppTextField(
+                                label: 'Password',
+                                icon: Icons.lock_outline,
+                                controller: password,
+                                obscureText: true,
+                                autofillHints: const [AutofillHints.password],
+                              ),
+                              if (error != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: Text(
+                                    error!,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.error,
+                                    ),
+                                  ),
+                                ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: () => context.push(
+                                    '/windows/recovery',
+                                    extra: widget.companyId,
+                                  ),
+                                  child: const Text('Forgot password?'),
+                                ),
+                              ),
+                              const SizedBox(height: 15),
+                              FilledButton.icon(
+                                key: const Key('local-login'),
+                                onPressed: busy ? null : _login,
+                                icon: busy
+                                    ? const SizedBox.square(
+                                        dimension: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.arrow_forward),
+                                label: Text(
+                                  busy ? 'Signing in…' : 'Sign in securely',
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              const Text(
+                                BrandConfig.poweredBy,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                      if (constraints.maxWidth < 780) return form;
+                      return SizedBox(
+                        height: 640,
+                        child: Row(
+                          children: [
+                            Expanded(child: welcome),
+                            Expanded(child: form),
+                          ],
+                        ),
+                      );
+                    },
                   ),
-                  TextButton(
-                    onPressed: () => context.push(
-                      '/windows/recovery',
-                      extra: widget.companyId,
-                    ),
-                    child: const Text('Forgot administrator password?'),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
         ),
-      ),
+      ],
     ),
   );
   Future<void> _login() async {

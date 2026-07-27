@@ -2,6 +2,7 @@ import 'package:codevault/core/config/brand_config.dart';
 import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:codevault/features/authentication/data/remote_auth_service.dart';
 import 'package:codevault/features/authentication/presentation/session_controller.dart';
+import 'package:codevault/shared/widgets/animated_login_background.dart';
 import 'package:codevault/shared/widgets/app_text_field.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +25,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) => Scaffold(
     body: Stack(
       children: [
-        Positioned.fill(child: _AnimatedLoginBackground(busy: busy)),
+        Positioned.fill(child: AnimatedLoginBackground(busy: busy)),
         Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -80,15 +81,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               spacing: 18,
                               runSpacing: 12,
                               children: [
-                                _Feature(
+                                FeatureWidget(
                                   icon: Icons.offline_bolt,
                                   label: 'Offline ready',
                                 ),
-                                _Feature(
+                                FeatureWidget(
                                   icon: Icons.sync,
                                   label: 'Secure sync',
                                 ),
-                                _Feature(
+                                FeatureWidget(
                                   icon: Icons.print,
                                   label: 'Multi-printer',
                                 ),
@@ -322,67 +323,5 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: child,
           ),
         ),
-  );
-}
-
-class _Feature extends StatelessWidget {
-  const _Feature({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(icon, color: Colors.white, size: 18),
-      const SizedBox(width: 6),
-      Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    ],
-  );
-}
-
-class _AnimatedLoginBackground extends StatefulWidget {
-  const _AnimatedLoginBackground({required this.busy});
-  final bool busy;
-  @override
-  State<_AnimatedLoginBackground> createState() =>
-      _AnimatedLoginBackgroundState();
-}
-
-class _AnimatedLoginBackgroundState extends State<_AnimatedLoginBackground>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController controller = AnimationController(
-    vsync: this,
-    duration: const Duration(seconds: 12),
-  )..repeat(reverse: true);
-  @override
-  void dispose() {
-    controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
-    builder: (context, _) => DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment(-1 + controller.value * .5, -1),
-          end: Alignment(1, 1 - controller.value * .35),
-          colors: const [
-            Color(0xFF0D0824),
-            Color(0xFF102849),
-            Color(0xFF071D24),
-            Color(0xFF231044),
-          ],
-          stops: const [0, .35, .68, 1],
-        ),
-      ),
-    ),
   );
 }

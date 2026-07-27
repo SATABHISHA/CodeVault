@@ -3,6 +3,7 @@ import 'package:codevault/core/layout/breakpoints.dart';
 import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:codevault/features/authentication/data/remote_auth_service.dart';
 import 'package:codevault/features/authentication/presentation/session_controller.dart';
+import 'package:codevault/app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -75,7 +76,7 @@ class AppShell extends ConsumerWidget {
       return Scaffold(
         appBar: AppBar(
           title: const Text(BrandConfig.productName),
-          actions: [_accountMenu(context, ref)],
+          actions: [_skinMenu(context, ref), _accountMenu(context, ref)],
         ),
         body: content,
         bottomNavigationBar: NavigationBar(
@@ -132,6 +133,7 @@ class AppShell extends ConsumerWidget {
                   title: Text(destinations[selected].$2),
                   automaticallyImplyLeading: false,
                   actions: [
+                    _skinMenu(context, ref),
                     _accountMenu(context, ref),
                     const SizedBox(width: 10),
                   ],
@@ -144,6 +146,24 @@ class AppShell extends ConsumerWidget {
       ),
     );
   }
+
+  Widget _skinMenu(BuildContext context, WidgetRef ref) =>
+      PopupMenuButton<AppSkin>(
+        tooltip: 'Change skin color',
+        icon: const Icon(Icons.palette_outlined),
+        onSelected: (skin) =>
+            ref.read(appearanceProvider.notifier).setSkin(skin),
+        itemBuilder: (context) => [
+          for (final skin in AppSkin.values)
+            PopupMenuItem(
+              value: skin,
+              child: ListTile(
+                leading: Icon(Icons.circle, color: skin.color),
+                title: Text(skin.label),
+              ),
+            ),
+        ],
+      );
 
   Widget _accountMenu(BuildContext context, WidgetRef ref) =>
       PopupMenuButton<String>(
