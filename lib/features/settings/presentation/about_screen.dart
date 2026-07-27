@@ -45,9 +45,9 @@ class AboutScreen extends ConsumerWidget {
             icon: Icon(Icons.dark_mode),
           ),
         ],
-        selected: {ref.watch(themeModeProvider)},
+        selected: {ref.watch(appearanceProvider).mode},
         onSelectionChanged: (value) =>
-            ref.read(themeModeProvider.notifier).setThemeMode(value.first),
+            ref.read(appearanceProvider.notifier).setThemeMode(value.first),
       ),
     ],
   );

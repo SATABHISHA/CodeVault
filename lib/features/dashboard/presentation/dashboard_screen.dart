@@ -1,104 +1,506 @@
-import 'package:codevault/shared/widgets/loading_skeleton.dart';
-import 'package:codevault/shared/widgets/status_badge.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-class DashboardScreen extends StatelessWidget {
+import '../../authentication/presentation/session_controller.dart';
+import '../../labels/application/production_activity.dart';
+import '../../labels/data/part_repository.dart';
+import '../../sync/data/android_cache_database.dart';
+
+class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
+
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(24),
-    children: [
-      Text(
-        'Operations overview',
-        style: Theme.of(
-          context,
-        ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-      ),
-      const SizedBox(height: 8),
-      Text(
-        'Monitor labels, printers and synchronization across your company.',
-        style: Theme.of(context).textTheme.bodyLarge,
-      ),
-      const SizedBox(height: 24),
-      LayoutBuilder(
-        builder: (_, constraints) {
-          final columns = constraints.maxWidth >= 900
-              ? 3
-              : constraints.maxWidth >= 560
-              ? 2
-              : 1;
-          return GridView.count(
-            crossAxisCount: columns,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 2.1,
-            children: const [
-              _MetricCard(
-                icon: Icons.inventory_2_outlined,
-                title: 'Parts',
-                value: '—',
-                badge: StatusBadge(label: 'Ready', tone: StatusTone.success),
-              ),
-              _MetricCard(
-                icon: Icons.print_outlined,
-                title: 'Print jobs',
-                value: '—',
-                badge: StatusBadge(label: 'Idle', tone: StatusTone.neutral),
-              ),
-              _MetricCard(
-                icon: Icons.sync_outlined,
-                title: 'Synchronization',
-                value: '—',
-                badge: StatusBadge(label: 'Checking', tone: StatusTone.info),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionProvider);
+    final activity = ref.watch(productionActivityProvider);
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF684BFF), Color(0xFFAA3DCE), Color(0xFFFF6685)],
+            ),
+            borderRadius: BorderRadius.circular(26),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF684BFF).withValues(alpha: .24),
+                blurRadius: 32,
+                offset: const Offset(0, 14),
               ),
             ],
-          );
-        },
-      ),
-      const SizedBox(height: 24),
-      const LoadingSkeleton(lines: 4),
-    ],
+          ),
+          child: Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 24,
+            runSpacing: 20,
+            children: [
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Production command center',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: 7),
+                  Text(
+                    'Your part master, labels, printers and sync health in one place.',
+                    style: TextStyle(color: Colors.white70, fontSize: 15),
+                  ),
+                ],
+              ),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF5B42DC),
+                ),
+                onPressed: () => context.go('/studio'),
+                icon: const Icon(Icons.add_circle_outline),
+                label: const Text('Create label'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 22),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth >= 1100
+                ? 4
+                : constraints.maxWidth >= 600
+                ? 2
+                : 1;
+            return GridView.count(
+              crossAxisCount: columns,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 2.05,
+              children: [
+                _PartsMetric(tenantId: session.tenantId),
+                _Metric(
+                  icon: Icons.print_rounded,
+                  color: const Color(0xFFFF7A59),
+                  label: 'Labels printed',
+                  value: '${activity.printed}',
+                  detail: activity.lastJob == null
+                      ? 'No labels printed yet'
+                      : 'Latest job completed',
+                ),
+                _LocalCountMetric(
+                  tenantId: session.tenantId,
+                  icon: Icons.dashboard_customize_rounded,
+                  color: Color(0xFF00B894),
+                  label: 'Label templates',
+                  source: _LocalMetricSource.templates,
+                  detail: 'No tenant templates yet',
+                ),
+                _LocalCountMetric(
+                  tenantId: session.tenantId,
+                  icon: Icons.print_outlined,
+                  color: Color(0xFF008CCF),
+                  label: 'Active printers',
+                  source: _LocalMetricSource.printers,
+                  detail: 'No tenant printers configured',
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 22),
+        LayoutBuilder(
+          builder: (context, constraints) => constraints.maxWidth >= 850
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: _ProductionChart(total: activity.printed),
+                    ),
+                    SizedBox(width: 16),
+                    Expanded(flex: 2, child: _RecentJobs(activity: activity)),
+                  ],
+                )
+              : Column(
+                  children: [
+                    _ProductionChart(total: activity.printed),
+                    SizedBox(height: 16),
+                    _RecentJobs(activity: activity),
+                  ],
+                ),
+        ),
+        const SizedBox(height: 22),
+        Text(
+          'Quick actions',
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            _Action(
+              icon: Icons.qr_code_2,
+              color: const Color(0xFF7048E8),
+              title: 'QR & Data Matrix',
+              subtitle: 'Design and print',
+              onTap: () => context.go('/studio'),
+            ),
+            _Action(
+              icon: Icons.print_outlined,
+              color: const Color(0xFF008FA8),
+              title: 'Printer setup',
+              subtitle: 'Connect and test',
+              onTap: () => context.go('/printers'),
+            ),
+            _Action(
+              icon: Icons.sync,
+              color: const Color(0xFF00A86B),
+              title: 'Synchronize',
+              subtitle: 'Review pending data',
+              onTap: () => context.go('/sync'),
+            ),
+            _Action(
+              icon: Icons.support_agent,
+              color: const Color(0xFFFF5C8A),
+              title: 'Get support',
+              subtitle: 'Create managed request',
+              onTap: () => context.go('/support'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _PartsMetric extends StatelessWidget {
+  const _PartsMetric({required this.tenantId});
+  final String? tenantId;
+  @override
+  Widget build(BuildContext context) => FutureBuilder<int>(
+    future: tenantId == null
+        ? Future.value(0)
+        : PartRepository().list(tenantId!).then((value) => value.length),
+    builder: (context, snapshot) => _Metric(
+      icon: Icons.inventory_2_rounded,
+      color: const Color(0xFF6D5DFB),
+      label: 'Active parts',
+      value: snapshot.hasError
+          ? '0'
+          : snapshot.hasData
+          ? '${snapshot.data}'
+          : '…',
+      detail: snapshot.hasError
+          ? 'Tenant data could not be loaded'
+          : 'Available for production',
+    ),
   );
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
+enum _LocalMetricSource { templates, printers }
+
+class _LocalCountMetric extends StatelessWidget {
+  const _LocalCountMetric({
+    required this.tenantId,
     required this.icon,
-    required this.title,
+    required this.color,
+    required this.label,
+    required this.source,
+    required this.detail,
+  });
+  final String? tenantId;
+  final IconData icon;
+  final Color color;
+  final String label;
+  final _LocalMetricSource source;
+  final String detail;
+
+  Future<int> _count() async {
+    if (tenantId == null) return 0;
+    final database = kIsWeb
+        ? AndroidCacheDatabase.forWeb(tenantId!)
+        : AndroidCacheDatabase(tenantId!);
+    try {
+      return switch (source) {
+        _LocalMetricSource.templates => (await (database.select(
+          database.localLabelPreviews,
+        )..where((row) => row.tenantId.equals(tenantId!))).get()).length,
+        _LocalMetricSource.printers => (await (database.select(
+          database.androidPrinterProfiles,
+        )..where((row) => row.tenantId.equals(tenantId!))).get()).length,
+      };
+    } finally {
+      await database.close();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<int>(
+    future: _count(),
+    builder: (context, snapshot) => _Metric(
+      icon: icon,
+      color: color,
+      label: label,
+      value: '${snapshot.data ?? 0}',
+      detail: snapshot.hasError ? 'Tenant data could not be loaded' : detail,
+    ),
+  );
+}
+
+class _ProductionChart extends StatelessWidget {
+  const _ProductionChart({required this.total});
+  final int total;
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '7-day label output',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              Text(
+                '$total total',
+                style: TextStyle(
+                  color: Color(0xFF00B894),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          SizedBox(
+            height: 150,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (final entry in [
+                  ('Mon', 0.04),
+                  ('Tue', 0.04),
+                  ('Wed', 0.04),
+                  ('Thu', 0.04),
+                  ('Fri', 0.04),
+                  ('Sat', 0.04),
+                  ('Sun', total > 0 ? 1.0 : 0.04),
+                ])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: FractionallySizedBox(
+                                heightFactor: entry.$2,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                      colors: [
+                                        Color(0xFF6047F5),
+                                        Color(0xFF00BCD4),
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 7),
+                          Text(
+                            entry.$1,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _RecentJobs extends StatelessWidget {
+  const _RecentJobs({required this.activity});
+  final ProductionActivity activity;
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Recent production',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 12),
+          if (activity.lastJob == null)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: Center(
+                child: Text('No production activity for this company yet.'),
+              ),
+            )
+          else
+            for (final job in [
+              (
+                'Latest label job',
+                '${activity.printed} labels this session',
+                const Color(0xFF00B894),
+              ),
+            ])
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                leading: CircleAvatar(
+                  radius: 17,
+                  backgroundColor: job.$3.withValues(alpha: .15),
+                  child: Icon(Icons.check, size: 17, color: job.$3),
+                ),
+                title: Text(
+                  job.$1,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(job.$2),
+                trailing: const Text(
+                  'Completed',
+                  style: TextStyle(fontSize: 11),
+                ),
+              ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _Metric extends StatelessWidget {
+  const _Metric({
+    required this.icon,
+    required this.color,
+    required this.label,
     required this.value,
-    required this.badge,
+    required this.detail,
   });
   final IconData icon;
-  final String title;
+  final Color color;
+  final String label;
   final String value;
-  final Widget badge;
+  final String detail;
   @override
   Widget build(BuildContext context) => Card(
     child: Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
         children: [
-          Icon(icon, size: 34, color: Theme.of(context).colorScheme.primary),
+          Container(
+            padding: const EdgeInsets.all(13),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: .13),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title),
+                Text(label),
                 Text(
                   value,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w900,
                   ),
                 ),
+                Text(detail, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
           ),
-          badge,
         ],
+      ),
+    ),
+  );
+}
+
+class _Action extends StatelessWidget {
+  const _Action({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 245,
+    child: Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: color.withValues(alpha: .14),
+                foregroundColor: color,
+                child: Icon(icon),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 14),
+            ],
+          ),
+        ),
       ),
     ),
   );

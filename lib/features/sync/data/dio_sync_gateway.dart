@@ -1,18 +1,24 @@
 import '../../../core/network/api_client.dart';
+import 'package:dio/dio.dart';
 import '../domain/sync_models.dart';
 
 class DioSyncGateway implements SyncRemoteGateway {
-  DioSyncGateway(this.client);
+  DioSyncGateway(this.client, {required this.deviceId});
   final ApiClient client;
+  final String deviceId;
   @override
-  Future<int> generation(String tenantId) async {
+  Future<GenerationState> generation(String tenantId) async {
     final response = await client.dio.get<Map<String, dynamic>>(
-      '/sync/generation',
-      queryParameters: {'tenant_id': tenantId},
+      '/tenants/$tenantId/sync/generation',
+      options: Options(headers: {'X-Device-UUID': deviceId}),
     );
-    return ((response.data!['data'] as Map<String, dynamic>)['generation']
-            as num)
-        .toInt();
+    final data = response.data!['data'] as Map<String, dynamic>;
+    final alignment = data['alignment'] as Map<String, dynamic>?;
+    return GenerationState(
+      generation: (data['generation'] as num).toInt(),
+      alignmentRequired: data['alignment_required'] as bool? ?? false,
+      alignmentId: alignment?['id'] as String?,
+    );
   }
 
   @override
@@ -22,9 +28,9 @@ class DioSyncGateway implements SyncRemoteGateway {
     int generation,
   ) async {
     final response = await client.dio.post<Map<String, dynamic>>(
-      '/sync/push',
+      '/tenants/$tenantId/sync/push',
+      options: Options(headers: {'X-Device-UUID': deviceId}),
       data: {
-        'tenant_id': tenantId,
         'generation': generation,
         'mutations': mutations
             .map(
@@ -53,11 +59,12 @@ class DioSyncGateway implements SyncRemoteGateway {
   @override
   Future<PullPage> pull(String tenantId, String? cursor) async {
     final response = await client.dio.get<Map<String, dynamic>>(
-      '/sync/pull',
+      '/tenants/$tenantId/sync/pull',
       queryParameters: {
-        'tenant_id': tenantId,
+        'generation': await _generationNumber(tenantId),
         ...cursor == null ? const <String, dynamic>{} : {'cursor': cursor},
       },
+      options: Options(headers: {'X-Device-UUID': deviceId}),
     );
     final data = response.data!['data'] as Map<String, dynamic>;
     return PullPage(
@@ -73,6 +80,25 @@ class DioSyncGateway implements SyncRemoteGateway {
       ],
       nextCursor: data['next_cursor'] as String?,
       generation: (data['generation'] as num).toInt(),
+      hasMore: data['has_more'] as bool? ?? false,
+    );
+  }
+
+  Future<int> _generationNumber(String tenantId) async =>
+      (await generation(tenantId)).generation;
+
+  @override
+  Future<void> acknowledgeAlignment(
+    String tenantId,
+    String alignmentId,
+    int generation,
+  ) async {
+    await client.dio.post<void>(
+      '/tenants/$tenantId/alignment/$alignmentId/acknowledge',
+      data: {'safety_backup_confirmed': true, 'generation': generation},
+      options: Options(
+        headers: {'X-Device-UUID': deviceId, 'X-Tenant-Generation': generation},
+      ),
     );
   }
 }

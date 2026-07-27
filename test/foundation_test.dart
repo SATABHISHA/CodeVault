@@ -7,6 +7,7 @@ import 'package:codevault/features/backup/presentation/backup_screen.dart';
 import 'package:codevault/features/dashboard/presentation/app_shell.dart';
 import 'package:codevault/shared/widgets/permission_gate.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -110,15 +111,19 @@ void main() {
     tester.view.physicalSize = const Size(400, 800);
     tester.view.devicePixelRatio = 1;
     await tester.pumpWidget(
-      const MaterialApp(
-        home: AppShell(locationOverride: '/dashboard', child: Text('Body')),
+      const ProviderScope(
+        child: MaterialApp(
+          home: AppShell(locationOverride: '/dashboard', child: Text('Body')),
+        ),
       ),
     );
     expect(find.byType(NavigationBar), findsOneWidget);
     tester.view.physicalSize = const Size(1200, 800);
     await tester.pumpWidget(
-      const MaterialApp(
-        home: AppShell(locationOverride: '/dashboard', child: Text('Body')),
+      const ProviderScope(
+        child: MaterialApp(
+          home: AppShell(locationOverride: '/dashboard', child: Text('Body')),
+        ),
       ),
     );
     expect(find.byType(NavigationRail), findsOneWidget);

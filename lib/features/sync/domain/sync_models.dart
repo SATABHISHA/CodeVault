@@ -37,10 +37,12 @@ class PullPage {
     required this.changes,
     required this.nextCursor,
     required this.generation,
+    this.hasMore = false,
   });
   final List<PullChange> changes;
   final String? nextCursor;
   final int generation;
+  final bool hasMore;
 }
 
 class PushResult {
@@ -49,12 +51,32 @@ class PushResult {
   final Map<String, Map<String, dynamic>> conflicts;
 }
 
+class GenerationState {
+  const GenerationState({
+    required this.generation,
+    this.alignmentId,
+    this.alignmentRequired = false,
+  });
+  final int generation;
+  final String? alignmentId;
+  final bool alignmentRequired;
+}
+
+abstract interface class AlignmentSafetyExporter {
+  Future<String> createSafetyExport(String tenantId, int localGeneration);
+}
+
 abstract interface class SyncRemoteGateway {
-  Future<int> generation(String tenantId);
+  Future<GenerationState> generation(String tenantId);
   Future<PushResult> push(
     String tenantId,
     List<PushMutation> mutations,
     int generation,
   );
   Future<PullPage> pull(String tenantId, String? cursor);
+  Future<void> acknowledgeAlignment(
+    String tenantId,
+    String alignmentId,
+    int generation,
+  );
 }

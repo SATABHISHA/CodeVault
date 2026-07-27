@@ -1,40 +1,61 @@
 import 'package:codevault/core/config/brand_config.dart';
 import 'package:codevault/core/layout/breakpoints.dart';
 import 'package:codevault/core/platform/platform_capabilities.dart';
+import 'package:codevault/features/authentication/data/remote_auth_service.dart';
+import 'package:codevault/features/authentication/presentation/session_controller.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../windows_desktop/application/windows_session.dart';
 
-class AppShell extends StatelessWidget {
+class AppShell extends ConsumerWidget {
   const AppShell({required this.child, this.locationOverride, super.key});
   final Widget child;
   final String? locationOverride;
   static const cloudDestinations = [
     (Icons.dashboard_outlined, 'Dashboard', '/dashboard'),
-    (Icons.print_outlined, 'Print', '/web/print'),
+    (Icons.admin_panel_settings_outlined, 'Administration', '/administration'),
+    (Icons.payments_outlined, 'Billing', '/billing'),
+    (Icons.auto_awesome_mosaic_outlined, 'Label studio', '/studio'),
     (Icons.sync_outlined, 'Sync', '/sync'),
     (Icons.backup_outlined, 'Backup', '/backup'),
     (Icons.support_agent_outlined, 'Support', '/support'),
+    (Icons.person_outline, 'Profile', '/profile'),
     (Icons.info_outline, 'About', '/about'),
   ];
 
   @override
-  Widget build(BuildContext context) {
-    final destinations = PlatformCapabilities.current().isWindows
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionProvider);
+    final baseDestinations = PlatformCapabilities.current().isWindows
         ? const [
-            (Icons.print_outlined, 'Operations', '/windows/operations'),
+            (Icons.dashboard_outlined, 'Dashboard', '/windows/dashboard'),
+            (
+              Icons.auto_awesome_mosaic_outlined,
+              'Label studio',
+              '/windows/operations',
+            ),
             (Icons.backup_outlined, 'Local backup', '/backup'),
-            (Icons.support_agent_outlined, 'Support', '/support'),
+            (Icons.group_outlined, 'Local users', '/windows/users'),
+            (Icons.person_outline, 'Profile', '/profile'),
             (Icons.info_outline, 'About', '/about'),
           ]
         : PlatformCapabilities.current().isAndroid
-        ? const [
-            (Icons.dashboard_outlined, 'Dashboard', '/dashboard'),
-            (Icons.print_outlined, 'Printers', '/printers'),
-            (Icons.sync_outlined, 'Sync', '/sync'),
-            (Icons.backup_outlined, 'Backup', '/backup'),
-            (Icons.info_outline, 'About', '/about'),
-          ]
+        ? cloudDestinations
         : cloudDestinations;
+    final destinations = baseDestinations
+        .where(
+          (item) =>
+              (item.$3 != '/administration' ||
+                  [
+                    'super-superadmin',
+                    'superadmin',
+                    'tenant-admin',
+                  ].contains(session.role)) &&
+              (item.$3 != '/billing' ||
+                  ['super-superadmin', 'superadmin'].contains(session.role)),
+        )
+        .toList();
     final size = layoutSizeFor(MediaQuery.sizeOf(context).width);
     final location = locationOverride ?? GoRouterState.of(context).uri.path;
     final selected = destinations
@@ -47,14 +68,22 @@ class AppShell extends StatelessWidget {
       ),
     );
     if (size == LayoutSize.compact) {
+      final compactDestinations = destinations.take(4).toList();
+      final compactSelected = compactDestinations
+          .indexWhere((item) => item.$3 == location)
+          .clamp(0, compactDestinations.length - 1);
       return Scaffold(
-        appBar: AppBar(title: const Text(BrandConfig.productName)),
+        appBar: AppBar(
+          title: const Text(BrandConfig.productName),
+          actions: [_accountMenu(context, ref)],
+        ),
         body: content,
         bottomNavigationBar: NavigationBar(
-          selectedIndex: selected,
-          onDestinationSelected: (index) => context.go(destinations[index].$3),
+          selectedIndex: compactSelected,
+          onDestinationSelected: (index) =>
+              context.go(compactDestinations[index].$3),
           destinations: [
-            for (final item in destinations)
+            for (final item in compactDestinations)
               NavigationDestination(icon: Icon(item.$1), label: item.$2),
           ],
         ),
@@ -102,6 +131,10 @@ class AppShell extends StatelessWidget {
                 AppBar(
                   title: Text(destinations[selected].$2),
                   automaticallyImplyLeading: false,
+                  actions: [
+                    _accountMenu(context, ref),
+                    const SizedBox(width: 10),
+                  ],
                 ),
                 Expanded(child: content),
               ],
@@ -111,4 +144,42 @@ class AppShell extends StatelessWidget {
       ),
     );
   }
+
+  Widget _accountMenu(BuildContext context, WidgetRef ref) =>
+      PopupMenuButton<String>(
+        tooltip: 'Account menu',
+        icon: const CircleAvatar(child: Icon(Icons.person_outline)),
+        onSelected: (value) async {
+          if (value == 'profile') {
+            context.go('/profile');
+            return;
+          }
+          try {
+            if (PlatformCapabilities.current().isWindows) {
+              WindowsSession.clear();
+              if (context.mounted) context.go('/windows');
+              return;
+            }
+            await RemoteAuthService().logout();
+          } catch (_) {
+            /* token is cleared locally */
+          }
+          ref.read(sessionProvider.notifier).signOut();
+          if (context.mounted) context.go('/login');
+        },
+        itemBuilder: (context) => const [
+          PopupMenuItem(
+            value: 'profile',
+            child: ListTile(
+              leading: Icon(Icons.settings_outlined),
+              title: Text('Profile & appearance'),
+            ),
+          ),
+          PopupMenuDivider(),
+          PopupMenuItem(
+            value: 'logout',
+            child: ListTile(leading: Icon(Icons.logout), title: Text('Logout')),
+          ),
+        ],
+      );
 }

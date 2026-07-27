@@ -8,11 +8,12 @@ import '../data/android_cache_database.dart';
 import '../domain/sync_models.dart';
 
 class SyncEngine {
-  SyncEngine(this.database, this.remote, {Uuid? uuid})
+  SyncEngine(this.database, this.remote, {this.safetyExporter, Uuid? uuid})
     : uuid = uuid ?? const Uuid();
   final AndroidCacheDatabase database;
   final SyncRemoteGateway remote;
   final Uuid uuid;
+  final AlignmentSafetyExporter? safetyExporter;
 
   Future<String> queue({
     required String tenantId,
@@ -35,21 +36,102 @@ class SyncEngine {
             payloadJson: jsonEncode(payload),
             baseVersion: Value(baseVersion),
             idempotencyKey: uuid.v4(),
+            syncStatus: Value(switch (operation) {
+              'create' => 'pending_create',
+              'update' => 'pending_update',
+              'delete' => 'pending_delete',
+              _ => 'failed',
+            }),
           ),
         );
     return id;
   }
 
+  Future<void> resolveConflict(String conflictId, String choice) async {
+    final conflict = await (database.select(
+      database.syncConflicts,
+    )..where((row) => row.id.equals(conflictId))).getSingle();
+    if (!const {
+      'keep_server',
+      'discard_local',
+      'reapply_local',
+    }.contains(choice)) {
+      throw ArgumentError.value(choice, 'choice');
+    }
+    if (choice == 'reapply_local') {
+      final server =
+          jsonDecode(conflict.serverPayloadJson) as Map<String, dynamic>;
+      await queue(
+        tenantId: conflict.tenantId,
+        entityType: conflict.entityType,
+        entityId: conflict.entityId,
+        operation: 'update',
+        payload: jsonDecode(conflict.localPayloadJson) as Map<String, dynamic>,
+        baseVersion: (server['version'] as num?)?.toInt(),
+      );
+    }
+    await (database.update(
+      database.syncConflicts,
+    )..where((row) => row.id.equals(conflictId))).write(
+      SyncConflictsCompanion(
+        resolution: Value(choice),
+        resolvedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
   Future<void> synchronize(String tenantId, {bool connected = true}) async {
     if (!connected) return;
     final metadata = await _metadata(tenantId);
-    final serverGeneration = await remote.generation(tenantId);
-    if (serverGeneration != metadata.generation) {
-      await _realign(tenantId, metadata.generation, serverGeneration);
+    final state = await remote.generation(tenantId);
+    if (state.generation != metadata.generation || state.alignmentRequired) {
+      final exporter = safetyExporter;
+      if (exporter == null) {
+        await (database.update(
+          database.syncMetadata,
+        )..where((row) => row.tenantId.equals(tenantId))).write(
+          const SyncMetadataCompanion(
+            alignmentStatus: Value('safety_export_required'),
+          ),
+        );
+        throw StateError('A safety export is required before alignment.');
+      }
+      final safetyReference = await exporter.createSafetyExport(
+        tenantId,
+        metadata.generation,
+      );
+      await _realign(
+        tenantId,
+        metadata.generation,
+        state.generation,
+        safetyReference,
+      );
+      await _pull(tenantId);
+      if (state.alignmentId != null) {
+        await remote.acknowledgeAlignment(
+          tenantId,
+          state.alignmentId!,
+          state.generation,
+        );
+      }
+      await (database.update(
+        database.syncMetadata,
+      )..where((row) => row.tenantId.equals(tenantId))).write(
+        SyncMetadataCompanion(
+          alignmentStatus: const Value('aligned'),
+          lastAlignmentReport: Value(
+            jsonEncode({
+              'safety_export': safetyReference,
+              'generation': state.generation,
+              'completed_at': DateTime.now().toUtc().toIso8601String(),
+            }),
+          ),
+        ),
+      );
     } else {
       await _push(tenantId, metadata.generation);
+      await _pull(tenantId);
     }
-    await _pull(tenantId);
   }
 
   Future<void> _push(String tenantId, int generation) async {
@@ -123,11 +205,20 @@ class SyncEngine {
   Future<void> _pull(String tenantId) async {
     var metadata = await _metadata(tenantId);
     var cursor = metadata.pullCursor;
+    var hasMore = false;
     do {
       final page = await remote.pull(tenantId, cursor);
       if (page.generation != metadata.generation) {
-        await _realign(tenantId, metadata.generation, page.generation);
-        metadata = await _metadata(tenantId);
+        await (database.update(
+          database.syncMetadata,
+        )..where((row) => row.tenantId.equals(tenantId))).write(
+          const SyncMetadataCompanion(
+            alignmentStatus: Value('safety_export_required'),
+          ),
+        );
+        throw StateError(
+          'Server generation changed during pull; restart alignment.',
+        );
       }
       await database.transaction(() async {
         for (final change in page.changes.where(
@@ -158,13 +249,15 @@ class SyncEngine {
             );
       });
       cursor = page.nextCursor;
-    } while (cursor != null);
+      hasMore = page.hasMore;
+    } while (hasMore);
   }
 
   Future<void> _realign(
     String tenantId,
     int localGeneration,
     int serverGeneration,
+    String safetyReference,
   ) async {
     final pending = await (database.select(
       database.syncOutbox,
@@ -198,6 +291,14 @@ class SyncEngine {
               tenantId: tenantId,
               pullCursor: const Value(null),
               generation: Value(serverGeneration),
+              alignmentStatus: const Value('downloading_authoritative_data'),
+              lastAlignmentReport: Value(
+                jsonEncode({
+                  'safety_export': safetyReference,
+                  'from_generation': localGeneration,
+                  'to_generation': serverGeneration,
+                }),
+              ),
             ),
           );
     });

@@ -1,5 +1,8 @@
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../../sync/application/web_local_export_service.dart';
 import '../../sync/data/android_cache_database.dart';
@@ -23,12 +26,12 @@ class _WebCacheTransferCardState extends State<WebCacheTransferCard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Browser-local cache transfer',
+            'Company-local data transfer',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 6),
           const Text(
-            'Exports cached data and pending drafts only. Laravel remains authoritative. Imports from another tenant or server generation are rejected; imported drafts require review.',
+            'Download this company’s local data, merge missing records without overwriting, or replace this company’s local cache. Files from another company are rejected.',
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -42,9 +45,15 @@ class _WebCacheTransferCardState extends State<WebCacheTransferCard> {
               ),
               OutlinedButton.icon(
                 key: const Key('import-web-cache'),
-                onPressed: busy ? null : _import,
+                onPressed: busy ? null : () => _import(replace: false),
                 icon: const Icon(Icons.upload_file),
-                label: const Text('Import .cvbackup'),
+                label: const Text('Merge import'),
+              ),
+              OutlinedButton.icon(
+                key: const Key('replace-local-cache'),
+                onPressed: busy ? null : () => _confirmReplace(context),
+                icon: const Icon(Icons.find_replace),
+                label: const Text('Replace local data'),
               ),
             ],
           ),
@@ -67,17 +76,26 @@ class _WebCacheTransferCardState extends State<WebCacheTransferCard> {
 
   Future<void> _export() async {
     setState(() => busy = true);
-    final database = AndroidCacheDatabase.forWeb(widget.tenantId);
+    final database = kIsWeb
+        ? AndroidCacheDatabase.forWeb(widget.tenantId)
+        : AndroidCacheDatabase(widget.tenantId);
     try {
       final bytes = await WebLocalExportService(
         database,
       ).export(widget.tenantId, await _generation(database));
-      await XFile.fromData(
+      final file = XFile.fromData(
         bytes,
         name: 'codevault-${widget.tenantId}.cvbackup',
         mimeType: 'application/zip',
-      ).saveTo('codevault-${widget.tenantId}.cvbackup');
-      if (mounted) setState(() => status = 'Browser cache export downloaded.');
+      );
+      final filename = 'codevault-${widget.tenantId}.cvbackup';
+      if (kIsWeb) {
+        await file.saveTo(filename);
+      } else {
+        final directory = await getApplicationDocumentsDirectory();
+        await file.saveTo(p.join(directory.path, filename));
+      }
+      if (mounted) setState(() => status = 'Company-local backup saved.');
     } catch (error) {
       if (mounted) setState(() => status = 'Export failed: $error');
     } finally {
@@ -86,7 +104,22 @@ class _WebCacheTransferCardState extends State<WebCacheTransferCard> {
     }
   }
 
-  Future<void> _import() async {
+  Future<void> _confirmReplace(BuildContext context) async {
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Replace local company data?'),
+        content: const Text('Only the signed-in company’s local cache will be replaced. Laravel data and other companies are unaffected.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Replace')),
+        ],
+      ),
+    );
+    if (approved == true) await _import(replace: true);
+  }
+
+  Future<void> _import({required bool replace}) async {
     final file = await openFile(
       acceptedTypeGroups: const [
         XTypeGroup(label: 'CodeVault backup', extensions: ['cvbackup']),
@@ -94,18 +127,22 @@ class _WebCacheTransferCardState extends State<WebCacheTransferCard> {
     );
     if (file == null) return;
     setState(() => busy = true);
-    final database = AndroidCacheDatabase.forWeb(widget.tenantId);
+    final database = kIsWeb
+        ? AndroidCacheDatabase.forWeb(widget.tenantId)
+        : AndroidCacheDatabase(widget.tenantId);
     try {
       final report = await WebLocalExportService(database).import(
         await file.readAsBytes(),
         tenantId: widget.tenantId,
         serverGeneration: await _generation(database),
+        replace: replace,
       );
-      if (mounted)
+      if (mounted) {
         setState(
           () => status =
-              'Imported ${report.cachedParts} cached records; ${report.pendingDrafts} drafts require review.',
+              '${replace ? 'Replaced with' : 'Merged'} ${report.cachedParts} cached records; ${report.pendingDrafts} drafts require review.',
         );
+      }
     } catch (error) {
       if (mounted) setState(() => status = 'Import rejected: $error');
     } finally {

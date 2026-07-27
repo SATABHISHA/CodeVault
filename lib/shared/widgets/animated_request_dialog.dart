@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../features/backup/data/managed_request_service.dart';
 import 'app_text_field.dart';
 
-enum RequestType { backup, restore }
+enum RequestType { backup, restore, support }
 
 Future<void> showAnimatedRequestDialog(
   BuildContext context, {
@@ -60,9 +60,11 @@ class _RequestDialogState extends State<_RequestDialog> {
   @override
   Widget build(BuildContext context) => AlertDialog(
     title: Text(
-      widget.type == RequestType.backup
-          ? 'Request managed backup'
-          : 'Request managed restore',
+      switch (widget.type) {
+        RequestType.backup => 'Request managed backup',
+        RequestType.restore => 'Request managed restore',
+        RequestType.support => 'Open support ticket',
+      },
     ),
     content: SizedBox(
       width: 520,
@@ -107,9 +109,9 @@ class _RequestDialogState extends State<_RequestDialog> {
                 ),
               ),
             const SizedBox(height: 10),
-            const Text(
-              'Submission creates a server request and queued SMTP notification. Only the Ahanova Super-Superadmin can execute it.',
-            ),
+            Text(widget.type == RequestType.support
+                ? 'Your ticket is sent to Ahanova platform support and remains visible to your company.'
+                : 'Submission creates a server request and queued SMTP notification. Only the Ahanova Super-Superadmin can execute it.'),
           ],
         ),
       ),

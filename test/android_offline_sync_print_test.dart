@@ -27,7 +27,11 @@ void main() {
   setUp(() {
     database = AndroidCacheDatabase.forTesting(NativeDatabase.memory());
     gateway = _FakeSyncGateway();
-    engine = SyncEngine(database, gateway);
+    engine = SyncEngine(
+      database,
+      gateway,
+      safetyExporter: _FakeSafetyExporter(),
+    );
   });
   tearDown(() => database.close());
 
@@ -45,6 +49,12 @@ void main() {
                   'data': {
                     'token': 'secret-token',
                     'must_change_password': false,
+                    'device_id': 'device-1',
+                    'user': {
+                      'id': 'user-1',
+                      'tenant_id': 'tenant-a',
+                      'roles': [],
+                    },
                   },
                 },
               ),
@@ -204,6 +214,53 @@ void main() {
       expect(
         (await database.select(database.syncMetadata).getSingle()).generation,
         2,
+      );
+      expect(
+        (await database.select(database.syncMetadata).getSingle())
+            .alignmentStatus,
+        'aligned',
+      );
+    },
+  );
+
+  test(
+    'alignment refuses destructive replacement without a safety exporter',
+    () async {
+      final unsafeEngine = SyncEngine(database, gateway);
+      gateway.serverGeneration = 2;
+      await expectLater(unsafeEngine.synchronize('tenant-a'), throwsStateError);
+      expect(
+        (await database.select(database.syncMetadata).getSingle())
+            .alignmentStatus,
+        'safety_export_required',
+      );
+    },
+  );
+
+  test(
+    'conflict resolution can keep server or reapply local with server version',
+    () async {
+      await database
+          .into(database.syncConflicts)
+          .insert(
+            SyncConflictsCompanion.insert(
+              id: 'conflict-1',
+              tenantId: 'tenant-a',
+              entityType: 'part',
+              entityId: 'part-1',
+              localPayloadJson: '{"name":"Local"}',
+              serverPayloadJson: '{"version":4}',
+              reason: 'version_conflict',
+            ),
+          );
+      await engine.resolveConflict('conflict-1', 'reapply_local');
+      expect(
+        (await database.select(database.syncConflicts).getSingle()).resolution,
+        'reapply_local',
+      );
+      expect(
+        (await database.select(database.syncOutbox).getSingle()).baseVersion,
+        4,
       );
     },
   );
@@ -394,7 +451,14 @@ class _FakeSyncGateway implements SyncRemoteGateway {
   final conflicts = <String, Map<String, dynamic>>{};
   List<PullChange> pullChanges = [];
   @override
-  Future<int> generation(String tenantId) async => serverGeneration;
+  Future<GenerationState> generation(String tenantId) async =>
+      GenerationState(generation: serverGeneration);
+  @override
+  Future<void> acknowledgeAlignment(
+    String tenantId,
+    String alignmentId,
+    int generation,
+  ) async {}
   @override
   Future<PullPage> pull(String tenantId, String? cursor) async => PullPage(
     changes: pullChanges,
@@ -417,6 +481,14 @@ class _FakeSyncGateway implements SyncRemoteGateway {
       conflicts: conflicts,
     );
   }
+}
+
+class _FakeSafetyExporter implements AlignmentSafetyExporter {
+  @override
+  Future<String> createSafetyExport(
+    String tenantId,
+    int localGeneration,
+  ) async => 'memory://$tenantId/$localGeneration.cvbackup';
 }
 
 class _MemoryPrintJobs implements PrintJobRepository {

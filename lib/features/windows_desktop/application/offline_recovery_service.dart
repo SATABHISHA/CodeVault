@@ -110,4 +110,29 @@ class OfflineRecoveryService {
     });
     return true;
   }
+
+  Future<bool> resetPassword({
+    required String challengeId,
+    required String code,
+    required String newPassword,
+  }) async {
+    if (newPassword.length < 12) {
+      throw StateError('The new password must contain at least 12 characters.');
+    }
+    final challenge = await (database.select(
+      database.recoveryCodes,
+    )..where((row) => row.id.equals(challengeId))).getSingleOrNull();
+    if (challenge == null || !await consume(challengeId, code)) return false;
+    final digest = await security.hashPassword(newPassword);
+    await (database.update(
+      database.localUsers,
+    )..where((row) => row.id.equals(challenge.userId))).write(
+      LocalUsersCompanion(
+        passwordHash: Value(digest.hash),
+        passwordSalt: Value(digest.salt),
+        mustChangePassword: const Value(false),
+      ),
+    );
+    return true;
+  }
 }

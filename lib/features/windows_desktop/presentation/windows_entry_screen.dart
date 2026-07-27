@@ -6,6 +6,7 @@ import '../../../core/config/brand_config.dart';
 import '../../../platform/windows/data/bootstrap_store.dart';
 import '../../../shared/widgets/app_text_field.dart';
 import '../application/local_account_service.dart';
+import '../application/windows_session.dart';
 import '../data/local_database.dart';
 
 class WindowsEntryScreen extends StatefulWidget {
@@ -214,58 +215,75 @@ class _LocalLoginScreenState extends State<LocalLoginScreen> {
   bool busy = false;
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 440),
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.offline_bolt, size: 52),
-                Text(
-                  'Local offline login',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const Text(
-                  'This Windows account is stored only on this computer.',
-                ),
-                const SizedBox(height: 24),
-                AppTextField(label: 'Username', controller: username),
-                const SizedBox(height: 16),
-                AppTextField(
-                  label: 'Password',
-                  controller: password,
-                  obscureText: true,
-                ),
-                if (error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Text(
-                      error!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
+    body: Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF160C38), Color(0xFF153C6B), Color(0xFF007F87)],
+        ),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: Card(
+            elevation: 24,
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 650),
+                    tween: Tween(begin: .7, end: 1),
+                    builder: (_, value, child) =>
+                        Transform.scale(scale: value, child: child),
+                    child: const CircleAvatar(
+                      radius: 36,
+                      child: Icon(Icons.qr_code_2_rounded, size: 44),
                     ),
                   ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    key: const Key('local-login'),
-                    onPressed: busy ? null : _login,
-                    child: const Text('Open local dashboard'),
+                  Text(
+                    'Local offline login',
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
-                ),
-                TextButton(
-                  onPressed: () => context.push(
-                    '/windows/recovery',
-                    extra: widget.companyId,
+                  const Text('Secure offline workspace • SQLite protected'),
+                  const SizedBox(height: 24),
+                  AppTextField(label: 'Username', controller: username),
+                  const SizedBox(height: 16),
+                  AppTextField(
+                    label: 'Password',
+                    controller: password,
+                    obscureText: true,
                   ),
-                  child: const Text('Local Offline Recovery'),
-                ),
-              ],
+                  if (error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        error!,
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      key: const Key('local-login'),
+                      onPressed: busy ? null : _login,
+                      child: const Text('Open local dashboard'),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => context.push(
+                      '/windows/recovery',
+                      extra: widget.companyId,
+                    ),
+                    child: const Text('Forgot administrator password?'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -279,8 +297,19 @@ class _LocalLoginScreenState extends State<LocalLoginScreen> {
     });
     final database = LocalDatabase(widget.companyId);
     try {
-      await LocalAccountService(database).login(username.text, password.text);
-      if (mounted) context.go('/windows/operations');
+      final result = await LocalAccountService(
+        database,
+      ).login(username.text, password.text);
+      WindowsSession.companyId = widget.companyId;
+      WindowsSession.userId = result.user.id;
+      WindowsSession.role = result.user.role;
+      WindowsSession.permissions = result.permissions;
+      final company = await (database.select(
+        database.companies,
+      )..where((row) => row.id.equals(widget.companyId))).getSingle();
+      WindowsSession.companyName = company.name;
+      WindowsSession.companyAddress = company.address ?? '';
+      if (mounted) context.go('/windows/dashboard');
     } catch (exception) {
       if (mounted) setState(() => error = exception.toString());
     } finally {

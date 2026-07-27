@@ -7,12 +7,20 @@ class AppSession {
     this.userId,
     this.tenantId,
     this.mustChangePassword = false,
+    this.deviceId,
+    this.role = '',
+    this.companyName = '',
+    this.companyAddress = '',
   });
   final bool authenticated;
   final Set<String> permissions;
   final String? userId;
   final String? tenantId;
   final bool mustChangePassword;
+  final String? deviceId;
+  final String role;
+  final String companyName;
+  final String companyAddress;
 }
 
 class SessionController extends Notifier<AppSession> {
@@ -29,15 +37,33 @@ class SessionController extends Notifier<AppSession> {
   void signOut() => state = const AppSession();
   void signInRemote({
     required String userId,
-    required String tenantId,
+    required String? tenantId,
     required bool mustChangePassword,
     required Set<String> permissions,
+    required String deviceId,
+    String role = '',
+    String companyName = '',
+    String companyAddress = '',
   }) => state = AppSession(
     authenticated: true,
     userId: userId,
     tenantId: tenantId,
     mustChangePassword: mustChangePassword,
     permissions: permissions,
+    deviceId: deviceId,
+    role: role,
+    companyName: companyName,
+    companyAddress: companyAddress,
+  );
+  void passwordChanged() => state = AppSession(
+    authenticated: state.authenticated,
+    permissions: state.permissions,
+    userId: state.userId,
+    tenantId: state.tenantId,
+    deviceId: state.deviceId,
+    role: state.role,
+    companyName: state.companyName,
+    companyAddress: state.companyAddress,
   );
 }
 

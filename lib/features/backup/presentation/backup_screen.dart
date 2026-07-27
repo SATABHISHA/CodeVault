@@ -9,6 +9,8 @@ import '../../authentication/presentation/session_controller.dart';
 import '../data/managed_request_service.dart';
 import '../../../core/network/api_client.dart';
 import 'web_cache_transfer_card.dart';
+import 'platform_protection_screen.dart';
+import 'local_backup_panel.dart';
 
 class BackupScreen extends StatelessWidget {
   const BackupScreen({super.key, this.capabilities, this.permissions});
@@ -28,22 +30,12 @@ class BackupScreen extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         if (platform.supportsLocalBackup) ...[
-          const EmptyState(
-            icon: Icons.folder_copy_outlined,
-            title: 'Local Windows backups',
-            message:
-                'Windows uses offline local backup and restore. Cloud requests are intentionally unavailable.',
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.save_alt),
-            label: const Text('Create local backup'),
-          ),
+          const LocalBackupPanel(),
         ] else if (platform.supportsManagedCloudRequests) ...[
-          if (platform.isWeb && permissions != null)
+          if ((platform.isWeb || platform.isAndroid) && permissions != null)
             WebCacheTransferCard(tenantId: _tenantId(context)),
-          if (platform.isWeb && permissions != null) const SizedBox(height: 16),
+          if ((platform.isWeb || platform.isAndroid) && permissions != null)
+            const SizedBox(height: 16),
           const EmptyState(
             icon: Icons.cloud_queue,
             title: 'Managed Laravel backup',
@@ -127,6 +119,11 @@ class BackupScreen extends StatelessWidget {
 class PermissionAwareBackupScreen extends ConsumerWidget {
   const PermissionAwareBackupScreen({super.key});
   @override
-  Widget build(BuildContext context, WidgetRef ref) =>
-      BackupScreen(permissions: ref.watch(sessionProvider).permissions);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(sessionProvider);
+    if (session.role == 'super-superadmin') {
+      return const PlatformProtectionScreen();
+    }
+    return BackupScreen(permissions: session.permissions);
+  }
 }

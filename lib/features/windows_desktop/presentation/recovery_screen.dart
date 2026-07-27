@@ -13,6 +13,8 @@ class OfflineRecoveryScreen extends StatefulWidget {
 
 class _OfflineRecoveryScreenState extends State<OfflineRecoveryScreen> {
   final username = TextEditingController();
+  final code = TextEditingController();
+  final password = TextEditingController();
   RecoveryChallenge? challenge;
   String? error;
   @override
@@ -50,7 +52,21 @@ class _OfflineRecoveryScreenState extends State<OfflineRecoveryScreen> {
                   ),
                   Text('Expires ${challenge!.expiresAt.toLocal()}'),
                   const Text(
-                    'Use this code once to reset the selected administrator password. A password change will be mandatory.',
+                    'Enter this one-time code below to choose the new administrator password.',
+                  ),
+                  const SizedBox(height: 16),
+                  AppTextField(label: 'One-time code', controller: code),
+                  const SizedBox(height: 12),
+                  AppTextField(
+                    label: 'New password (12+ characters)',
+                    controller: password,
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _reset,
+                    icon: const Icon(Icons.lock_reset),
+                    label: const Text('Change administrator password'),
                   ),
                 ],
                 if (error != null)
@@ -82,6 +98,25 @@ class _OfflineRecoveryScreenState extends State<OfflineRecoveryScreen> {
           error = null;
         });
       }
+    } catch (exception) {
+      if (mounted) setState(() => error = exception.toString());
+    } finally {
+      await database.close();
+    }
+  }
+
+  Future<void> _reset() async {
+    final currentChallenge = challenge;
+    if (currentChallenge == null) return;
+    final database = LocalDatabase(widget.companyId);
+    try {
+      final changed = await OfflineRecoveryService(database).resetPassword(
+        challengeId: currentChallenge.id,
+        code: code.text,
+        newPassword: password.text,
+      );
+      if (!changed) throw StateError('The code is invalid or has expired.');
+      if (mounted) Navigator.pop(context);
     } catch (exception) {
       if (mounted) setState(() => error = exception.toString());
     } finally {

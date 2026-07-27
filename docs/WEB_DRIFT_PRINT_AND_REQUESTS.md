@@ -22,11 +22,11 @@ Sanctum bearer tokens are held through `flutter_secure_storage` (WebCrypto-backe
 | `GET` | `/api/v1/me` | Resolves user ID, tenant ID, roles, and permissions. |
 | `POST` | `/api/v1/auth/logout` | Revokes the active token, then removes it locally. |
 | `POST` | `/api/v1/tenants/{tenant}/managed-requests` | Sends backup/restore type, contact details, phone, requested scope, browser/device metadata, reason, notes, and restore preference. Laravel persists the request and queues SMTP to `wecare@ahanova.in`. Flutter has no execution endpoint. |
-| `GET` | `/api/v1/sync/generation?tenant_id=` | Reads the authoritative tenant generation. |
-| `POST` | `/api/v1/sync/push` | Pushes UUID/idempotency-key mutations with base version and generation. |
-| `GET` | `/api/v1/sync/pull?tenant_id=&cursor=` | Pulls versioned tenant changes and the next cursor. |
+| `GET` | `/api/v1/tenants/{tenant}/sync/generation` | Reads the authoritative generation and device alignment state. |
+| `POST` | `/api/v1/tenants/{tenant}/sync/push` | Pushes UUID/idempotency-key mutations with base version and generation. |
+| `GET` | `/api/v1/tenants/{tenant}/sync/pull?generation=&cursor=` | Pulls versioned tenant changes, tombstones and the next cursor. |
 
-The auth, `/me`, logout, and managed-request APIs exist in the inspected Laravel implementation. The three `/sync/*` routes are still absent from Laravel, so production Web synchronization must remain disabled until the backend contract is implemented and integration-tested. Direct browser-to-MySQL access is prohibited.
+The auth, `/me`, logout, managed-request, and tenant sync APIs exist in Laravel. Direct browser-to-MySQL access is prohibited.
 
 ## Local application APIs
 
@@ -48,7 +48,7 @@ A future local agent must require tenant/device pairing, short-lived signed jobs
 - Test persistence, quotas, eviction, PDF sizing, and downloads on the supported browser matrix.
 - SMTP delivery is owned and tested by Laravel; Flutter verifies only request submission and never reports email success independently.
 - Physical-size printing requires real browser/driver/printer acceptance tests.
-- Complete the missing Laravel sync endpoints before enabling online synchronization.
+- Validate sync throughput, retention, and restore alignment on production-like data before rollout.
 
 ## Validation
 

@@ -6,6 +6,7 @@ import 'package:cryptography/cryptography.dart';
 import 'package:drift/drift.dart';
 
 import '../data/android_cache_database.dart';
+import '../domain/sync_models.dart';
 
 class WebImportReport {
   const WebImportReport({
@@ -14,6 +15,21 @@ class WebImportReport {
   });
   final int cachedParts;
   final int pendingDrafts;
+}
+
+class PortableAlignmentSafetyExporter implements AlignmentSafetyExporter {
+  const PortableAlignmentSafetyExporter(this.service, this.save);
+  final WebLocalExportService service;
+  final Future<String> Function(Uint8List bytes, String filename) save;
+
+  @override
+  Future<String> createSafetyExport(
+    String tenantId,
+    int localGeneration,
+  ) async {
+    final filename = 'codevault-$tenantId-generation-$localGeneration.cvbackup';
+    return save(await service.export(tenantId, localGeneration), filename);
+  }
 }
 
 class WebLocalExportService {
@@ -26,6 +42,15 @@ class WebLocalExportService {
     )..where((row) => row.tenantId.equals(tenantId))).get();
     final outbox = await (database.select(
       database.syncOutbox,
+    )..where((row) => row.tenantId.equals(tenantId))).get();
+    final previews = await (database.select(
+      database.localLabelPreviews,
+    )..where((row) => row.tenantId.equals(tenantId))).get();
+    final drafts = await (database.select(
+      database.managedRequestDrafts,
+    )..where((row) => row.tenantId.equals(tenantId))).get();
+    final printLogs = await (database.select(
+      database.offlinePrintLogs,
     )..where((row) => row.tenantId.equals(tenantId))).get();
     final payload = utf8.encode(
       jsonEncode({
@@ -49,6 +74,32 @@ class WebLocalExportService {
               'payload': jsonDecode(row.payloadJson),
               'base_version': row.baseVersion,
               'idempotency_key': row.idempotencyKey,
+            },
+        ],
+        'local_previews': [
+          for (final row in previews)
+            {
+              'id': row.id,
+              'definition': jsonDecode(row.definitionJson),
+              'updated_at': row.updatedAt.toUtc().toIso8601String(),
+            },
+        ],
+        'request_drafts': [
+          for (final row in drafts)
+            {
+              'id': row.id,
+              'request_type': row.requestType,
+              'payload': jsonDecode(row.payloadJson),
+              'updated_at': row.updatedAt.toUtc().toIso8601String(),
+            },
+        ],
+        'offline_print_logs': [
+          for (final row in printLogs)
+            {
+              'id': row.id,
+              'print_job_id': row.printJobId,
+              'payload': jsonDecode(row.payloadJson),
+              'created_at': row.createdAt.toUtc().toIso8601String(),
             },
         ],
       }),
@@ -76,12 +127,14 @@ class WebLocalExportService {
     Uint8List bytes, {
     required String tenantId,
     required int serverGeneration,
+    bool replace = false,
   }) async {
     final archive = ZipDecoder().decodeBytes(bytes, verify: true);
     final manifestFile = archive.findFile('manifest.json');
     final payloadFile = archive.findFile('data/browser-cache.json');
-    if (manifestFile == null || payloadFile == null)
+    if (manifestFile == null || payloadFile == null) {
       throw const FormatException('Invalid browser export.');
+    }
     final manifest =
         jsonDecode(utf8.decode(manifestFile.content as List<int>))
             as Map<String, dynamic>;
@@ -91,10 +144,11 @@ class WebLocalExportService {
         'Export belongs to another tenant or format.',
       );
     }
-    if (manifest['generation'] != serverGeneration)
+    if (manifest['generation'] != serverGeneration) {
       throw StateError(
         'Browser export is stale; align with Laravel before import.',
       );
+    }
     final payload = payloadFile.content as List<int>;
     if (base64Encode((await Sha256().hash(payload)).bytes) !=
         manifest['payload_sha256']) {
@@ -104,6 +158,17 @@ class WebLocalExportService {
     final parts = decoded['cached_parts'] as List;
     final drafts = decoded['pending_mutations'] as List;
     await database.transaction(() async {
+      if (replace) {
+        await (database.delete(database.cachedParts)
+              ..where((row) => row.tenantId.equals(tenantId)))
+            .go();
+        await (database.delete(database.syncOutbox)
+              ..where((row) => row.tenantId.equals(tenantId)))
+            .go();
+        await (database.delete(database.syncConflicts)
+              ..where((row) => row.tenantId.equals(tenantId)))
+            .go();
+      }
       for (final raw in parts.cast<Map<String, dynamic>>()) {
         final existing =
             await (database.select(database.cachedParts)..where(

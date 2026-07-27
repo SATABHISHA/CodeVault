@@ -3,6 +3,7 @@ import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:codevault/features/authentication/data/remote_auth_service.dart';
 import 'package:codevault/features/authentication/presentation/session_controller.dart';
 import 'package:codevault/shared/widgets/app_text_field.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,93 +19,191 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final login = TextEditingController();
   final password = TextEditingController();
   bool busy = false;
-  String? error;
+
   @override
   Widget build(BuildContext context) => Scaffold(
-    body: Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 440),
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: AutofillGroup(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.qr_code_scanner_rounded,
-                      size: 56,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      BrandConfig.productName,
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    const Text('Secure Laravel account login'),
-                    const SizedBox(height: 28),
-                    AppTextField(
-                      label: 'Username or email',
-                      icon: Icons.person_outline,
-                      controller: login,
-                      autofillHints: const [AutofillHints.username],
-                    ),
-                    const SizedBox(height: 16),
-                    AppTextField(
-                      label: 'Password',
-                      icon: Icons.lock_outline,
-                      controller: password,
-                      obscureText: true,
-                      autofillHints: const [AutofillHints.password],
-                    ),
-                    if (error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Text(
-                          error!,
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.error,
+    body: Stack(
+      children: [
+        Positioned.fill(child: _AnimatedLoginBackground(busy: busy)),
+        Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1060),
+              child: Card(
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: .94),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final welcome = Container(
+                        padding: const EdgeInsets.all(42),
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFF7357FF), Color(0xFF00AFC8)],
                           ),
                         ),
-                      ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        key: const Key('remote-login'),
-                        onPressed: busy ? null : _submit,
-                        icon: const Icon(Icons.login),
-                        label: Text(busy ? 'Signing in…' : 'Sign in'),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      BrandConfig.poweredBy,
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.qr_code_2_rounded,
+                              color: Colors.white,
+                              size: 58,
+                            ),
+                            SizedBox(height: 30),
+                            Text(
+                              'Industrial labels, beautifully controlled.',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w900,
+                                height: 1.15,
+                              ),
+                            ),
+                            SizedBox(height: 16),
+                            Text(
+                              'Manage part masters, generate production codes, preview exact label sizes and print across Windows, web and Android.',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 16,
+                                height: 1.5,
+                              ),
+                            ),
+                            SizedBox(height: 28),
+                            Wrap(
+                              spacing: 18,
+                              runSpacing: 12,
+                              children: [
+                                _Feature(
+                                  icon: Icons.offline_bolt,
+                                  label: 'Offline ready',
+                                ),
+                                _Feature(
+                                  icon: Icons.sync,
+                                  label: 'Secure sync',
+                                ),
+                                _Feature(
+                                  icon: Icons.print,
+                                  label: 'Multi-printer',
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                      final form = Padding(
+                        padding: const EdgeInsets.all(38),
+                        child: AutofillGroup(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                BrandConfig.productName,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(fontWeight: FontWeight.w900),
+                              ),
+                              const SizedBox(height: 6),
+                              const Text(
+                                'Welcome back. Sign in to your workspace.',
+                              ),
+                              const SizedBox(height: 28),
+                              AppTextField(
+                                label: 'Username or email',
+                                icon: Icons.person_outline,
+                                controller: login,
+                                autofillHints: const [AutofillHints.username],
+                              ),
+                              const SizedBox(height: 15),
+                              AppTextField(
+                                label: 'Password',
+                                icon: Icons.lock_outline,
+                                controller: password,
+                                obscureText: true,
+                                autofillHints: const [AutofillHints.password],
+                              ),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: () =>
+                                      context.go('/forgot-password'),
+                                  child: const Text('Forgot password?'),
+                                ),
+                              ),
+                              const SizedBox(height: 15),
+                              FilledButton.icon(
+                                key: const Key('remote-login'),
+                                onPressed: busy ? null : _submit,
+                                icon: busy
+                                    ? const SizedBox.square(
+                                        dimension: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(Icons.arrow_forward),
+                                label: Text(
+                                  busy ? 'Signing in…' : 'Sign in securely',
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                              const Text(
+                                BrandConfig.poweredBy,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                      if (constraints.maxWidth < 780) return form;
+                      return SizedBox(
+                        height: 640,
+                        child: Row(
+                          children: [
+                            Expanded(child: welcome),
+                            Expanded(child: form),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
           ),
         ),
-      ),
+      ],
     ),
   );
+
   Future<void> _submit() async {
+    if (login.text.trim().isEmpty || password.text.isEmpty) {
+      await _showLoginFailure('Enter your username and password to continue.');
+      return;
+    }
     setState(() {
       busy = true;
-      error = null;
     });
     try {
       final capabilities = PlatformCapabilities.current();
       final session = await (widget.authService ?? RemoteAuthService()).login(
         login: login.text,
         password: password.text,
-        deviceName: 'CodeVault ${capabilities.isAndroid ? 'Android' : 'Web'}',
+        deviceName:
+            'CodeVault ${capabilities.isAndroid
+                ? 'Android'
+                : capabilities.isWindows
+                ? 'Windows'
+                : 'Web'}',
         platform: capabilities.isAndroid ? 'android' : 'web',
       );
       ref
@@ -114,17 +213,176 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             tenantId: session.tenantId,
             mustChangePassword: session.mustChangePassword,
             permissions: session.permissions,
+            deviceId: session.deviceId,
+            role: session.role,
+            companyName: session.companyName,
+            companyAddress: session.companyAddress,
           );
-      if (mounted) context.go('/dashboard');
+      if (mounted) {
+        context.go('/dashboard');
+      }
     } catch (exception) {
       if (mounted) {
-        setState(
-          () => error =
-              'Sign in failed. Check credentials and server connection.',
-        );
+        final message = exception is DioException && exception.response == null
+            ? 'We could not reach CodeVault. Check your connection and try again.'
+            : exception is DioException && exception.response?.statusCode == 429
+            ? 'Too many attempts. Please wait a moment before trying again.'
+            : 'The username or password is incorrect. Please check your details.';
+        await _showLoginFailure(message);
       }
     } finally {
       if (mounted) setState(() => busy = false);
     }
   }
+
+  Future<void> _showLoginFailure(String message) => showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'Close',
+    barrierColor: Colors.black54,
+    transitionDuration: const Duration(milliseconds: 320),
+    pageBuilder: (context, animation, secondaryAnimation) => Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 410,
+          margin: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(26),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(26),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black38,
+                blurRadius: 40,
+                offset: Offset(0, 18),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TweenAnimationBuilder<double>(
+                duration: const Duration(milliseconds: 550),
+                tween: Tween(begin: 0, end: 1),
+                curve: Curves.elasticOut,
+                builder: (context, value, child) =>
+                    Transform.scale(scale: value, child: child),
+                child: Container(
+                  width: 76,
+                  height: 76,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [Color(0xFFFF5C8A), Color(0xFFFF875C)],
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.lock_person_rounded,
+                    color: Colors.white,
+                    size: 38,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Sign in unsuccessful',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 9),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              const SizedBox(height: 22),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Try again'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+    transitionBuilder: (context, animation, secondaryAnimation, child) =>
+        FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutBack,
+            ),
+            child: child,
+          ),
+        ),
+  );
+}
+
+class _Feature extends StatelessWidget {
+  const _Feature({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, color: Colors.white, size: 18),
+      const SizedBox(width: 6),
+      Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ],
+  );
+}
+
+class _AnimatedLoginBackground extends StatefulWidget {
+  const _AnimatedLoginBackground({required this.busy});
+  final bool busy;
+  @override
+  State<_AnimatedLoginBackground> createState() =>
+      _AnimatedLoginBackgroundState();
+}
+
+class _AnimatedLoginBackgroundState extends State<_AnimatedLoginBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController controller = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 12),
+  )..repeat(reverse: true);
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: controller,
+    builder: (context, _) => DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment(-1 + controller.value * .5, -1),
+          end: Alignment(1, 1 - controller.value * .35),
+          colors: const [
+            Color(0xFF0D0824),
+            Color(0xFF102849),
+            Color(0xFF071D24),
+            Color(0xFF231044),
+          ],
+          stops: const [0, .35, .68, 1],
+        ),
+      ),
+    ),
+  );
 }

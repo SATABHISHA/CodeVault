@@ -12,6 +12,10 @@ class CachedParts extends Table {
   IntColumn get serverVersion => integer()();
   BoolColumn get deleted => boolean().withDefault(const Constant(false))();
   DateTimeColumn get updatedAt => dateTime()();
+  TextColumn get syncStatus => text().withDefault(const Constant('synced'))();
+  DateTimeColumn get lastSyncedAt => dateTime().nullable()();
+  TextColumn get sourceDevice => text().nullable()();
+  IntColumn get serverGeneration => integer().withDefault(const Constant(1))();
   @override
   Set<Column<Object>> get primaryKey => {tenantId, id};
 }
@@ -29,6 +33,8 @@ class SyncOutbox extends Table {
   DateTimeColumn get nextAttemptAt =>
       dateTime().withDefault(currentDateAndTime)();
   TextColumn get lastError => text().nullable()();
+  TextColumn get syncStatus =>
+      text().withDefault(const Constant('pending_create'))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -44,6 +50,7 @@ class SyncConflicts extends Table {
   TextColumn get reason => text()();
   DateTimeColumn get detectedAt => dateTime().withDefault(currentDateAndTime)();
   DateTimeColumn get resolvedAt => dateTime().nullable()();
+  TextColumn get resolution => text().nullable()();
   @override
   Set<Column<Object>> get primaryKey => {id};
 }
@@ -53,6 +60,9 @@ class SyncMetadata extends Table {
   TextColumn get pullCursor => text().nullable()();
   IntColumn get generation => integer().withDefault(const Constant(0))();
   DateTimeColumn get lastPulledAt => dateTime().nullable()();
+  TextColumn get alignmentStatus =>
+      text().withDefault(const Constant('aligned'))();
+  TextColumn get lastAlignmentReport => text().nullable()();
   @override
   Set<Column<Object>> get primaryKey => {tenantId};
 }
@@ -86,6 +96,38 @@ class AndroidPrinterProfiles extends Table {
   Set<Column<Object>> get primaryKey => {tenantId, id};
 }
 
+class OfflinePrintLogs extends Table {
+  TextColumn get id => text()();
+  TextColumn get tenantId => text()();
+  TextColumn get printJobId => text()();
+  TextColumn get payloadJson => text()();
+  TextColumn get syncStatus =>
+      text().withDefault(const Constant('pending_create'))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get lastSyncedAt => dateTime().nullable()();
+  @override
+  Set<Column<Object>> get primaryKey => {tenantId, id};
+}
+
+class LocalLabelPreviews extends Table {
+  TextColumn get id => text()();
+  TextColumn get tenantId => text()();
+  TextColumn get definitionJson => text()();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column<Object>> get primaryKey => {tenantId, id};
+}
+
+class ManagedRequestDrafts extends Table {
+  TextColumn get id => text()();
+  TextColumn get tenantId => text()();
+  TextColumn get requestType => text()();
+  TextColumn get payloadJson => text()();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  @override
+  Set<Column<Object>> get primaryKey => {tenantId, id};
+}
+
 @DriftDatabase(
   tables: [
     CachedParts,
@@ -94,6 +136,9 @@ class AndroidPrinterProfiles extends Table {
     SyncMetadata,
     AndroidPrintJobs,
     AndroidPrinterProfiles,
+    OfflinePrintLogs,
+    LocalLabelPreviews,
+    ManagedRequestDrafts,
   ],
 )
 class AndroidCacheDatabase extends _$AndroidCacheDatabase {
@@ -102,10 +147,28 @@ class AndroidCacheDatabase extends _$AndroidCacheDatabase {
     : super(openWebDatabase(tenantId));
   AndroidCacheDatabase.forTesting(super.executor);
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (migrator) => migrator.createAll(),
+    onUpgrade: (migrator, from, to) async {
+      if (from < 2) {
+        await migrator.addColumn(cachedParts, cachedParts.syncStatus);
+        await migrator.addColumn(cachedParts, cachedParts.lastSyncedAt);
+        await migrator.addColumn(cachedParts, cachedParts.sourceDevice);
+        await migrator.addColumn(cachedParts, cachedParts.serverGeneration);
+        await migrator.addColumn(syncOutbox, syncOutbox.syncStatus);
+        await migrator.addColumn(syncConflicts, syncConflicts.resolution);
+        await migrator.addColumn(syncMetadata, syncMetadata.alignmentStatus);
+        await migrator.addColumn(
+          syncMetadata,
+          syncMetadata.lastAlignmentReport,
+        );
+        await migrator.createTable(offlinePrintLogs);
+        await migrator.createTable(localLabelPreviews);
+        await migrator.createTable(managedRequestDrafts);
+      }
+    },
     beforeOpen: (details) => customStatement('PRAGMA foreign_keys = ON'),
   );
 }

@@ -10,11 +10,11 @@ Android uses Laravel/MySQL as the only authoritative server. Each tenant gets a 
 | `GET` | `/api/v1/me` | Resolves the authenticated user and mandatory tenant context. |
 | `POST` | `/api/v1/auth/logout` | Revokes the active Sanctum token before local deletion. |
 | `POST` | `/api/v1/tenants/{tenant}/managed-requests` | Submits backup/restore request contact, scope, platform/device, reason, notes and restore preference. Laravel creates the request and queues SMTP. The Flutter client has no execute API. |
-| `GET` | `/api/v1/sync/generation?tenant_id=` | Retrieves the current tenant generation before push/pull. |
-| `POST` | `/api/v1/sync/push` | Pushes UUID mutations with base version, generation and per-item idempotency key. |
-| `GET` | `/api/v1/sync/pull?tenant_id=&cursor=` | Pulls a versioned page and next cursor. |
+| `GET` | `/api/v1/tenants/{tenant}/sync/generation` | Retrieves the current tenant generation and device alignment state. |
+| `POST` | `/api/v1/tenants/{tenant}/sync/push` | Pushes UUID mutations with base version, generation and per-item idempotency key. |
+| `GET` | `/api/v1/tenants/{tenant}/sync/pull?generation=&cursor=` | Pulls a versioned page, tombstones and next cursor. |
 
-The first four endpoints exist in the current Laravel repository. The three `/sync/*` endpoints are required by the architecture but are not currently registered by Laravel. `DioSyncGateway` documents and implements the client contract, while production synchronization must remain disabled until those backend endpoints are delivered. It must not fall back to direct MySQL access.
+All listed endpoints now exist in Laravel. Sync requests require the authenticated tenant device UUID, permissions and current generation. Direct MySQL access remains prohibited.
 
 ## Local application APIs
 
