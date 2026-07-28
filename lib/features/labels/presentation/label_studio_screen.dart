@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:printing/printing.dart';
 
 import '../../../features/authentication/presentation/session_controller.dart';
 import '../../../core/platform/platform_capabilities.dart';
@@ -43,9 +44,12 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   bool includeName = true;
   String symbology = 'data_matrix';
   String labelSize = '100 × 30 mm';
-  String port = 'PORT 1';
+  String port = '';
   String message = 'Ready for production';
   Timer? debounce;
+  List<Printer> _availablePrinters = [];
+  Printer? _selectedPrinter;
+  bool _printersLoaded = false;
 
   static const sizes = {
     '38 × 25 mm': (38.0, 25.0),
@@ -77,7 +81,38 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     ]) {
       controller.addListener(_refresh);
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _load();
+      _loadPrinters();
+    });
+  }
+
+  Future<void> _loadPrinters() async {
+    try {
+      final printers = await Printing.listPrinters();
+      if (mounted) {
+        setState(() {
+          _availablePrinters = printers.where((p) => p.isAvailable).toList();
+          if (_availablePrinters.isNotEmpty) {
+            _selectedPrinter = _availablePrinters.cast<Printer?>().firstWhere(
+                  (p) => p!.isDefault,
+                  orElse: () => _availablePrinters.first,
+                );
+            port = _selectedPrinter!.name;
+          } else {
+            port = 'System Default';
+          }
+          _printersLoaded = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _printersLoaded = true;
+          port = 'System Default';
+        });
+      }
+    }
   }
 
   @override
@@ -279,12 +314,45 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
         Row(
           children: [
             Expanded(
-              child: _dropdown('Printer port', port, const [
-                'PORT 1',
-                'PORT 2',
-                'PORT 3',
-                'PORT 4',
-              ], (value) => setState(() => port = value)),
+              child: _printersLoaded
+                  ? _availablePrinters.isEmpty
+                      ? DropdownButtonFormField<String>(
+                          value: 'System Default',
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Printer port'),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'System Default',
+                              child: Text('SYSTEM DEFAULT'),
+                            )
+                          ],
+                          onChanged: null,
+                        )
+                      : DropdownButtonFormField<Printer>(
+                          value: _selectedPrinter,
+                          isExpanded: true,
+                          decoration: const InputDecoration(labelText: 'Printer port'),
+                          items: _availablePrinters
+                              .map(
+                                (item) => DropdownMenuItem(
+                                  value: item,
+                                  child: Text(item.name.toUpperCase()),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (next) {
+                            if (next != null) {
+                              setState(() {
+                                _selectedPrinter = next;
+                                port = next.name;
+                              });
+                            }
+                          },
+                        )
+                  : const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -755,7 +823,14 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     setState(() => busy = true);
     try {
       final bytes = await const BrowserPdfGenerator().generate(_document);
-      await gateway.showPrintDialog(bytes, 'codevault-${partNumber.text}.pdf');
+      if (_selectedPrinter != null) {
+        await Printing.directPrintPdf(
+          printer: _selectedPrinter!,
+          onLayout: (format) async => bytes,
+        );
+      } else {
+        await gateway.showPrintDialog(bytes, 'codevault-${partNumber.text}.pdf');
+      }
       ref.read(productionActivityProvider.notifier).recordPrint(copies);
       _notice('$copies label${copies == 1 ? '' : 's'} sent to print');
     } catch (error) {
