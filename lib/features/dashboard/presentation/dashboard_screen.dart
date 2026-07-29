@@ -5,8 +5,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../authentication/presentation/session_controller.dart';
 import '../../labels/application/production_activity.dart';
+import '../../labels/data/local_part_repository.dart';
 import '../../labels/data/part_repository.dart';
 import '../../sync/data/android_cache_database.dart';
+import '../../windows_desktop/application/windows_session.dart';
+import '../../windows_desktop/data/local_database.dart' show LocalDatabase;
+import '../../../core/platform/platform_capabilities.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -187,25 +191,36 @@ class DashboardScreen extends ConsumerWidget {
 class _PartsMetric extends StatelessWidget {
   const _PartsMetric({required this.tenantId});
   final String? tenantId;
+
+  PartRepository _getRepo(String activeTenant) {
+    if (PlatformCapabilities.current().isWindows) {
+      return LocalPartRepository(LocalDatabase(activeTenant));
+    }
+    return CloudPartRepository();
+  }
+
   @override
-  Widget build(BuildContext context) => FutureBuilder<int>(
-    future: tenantId == null
-        ? Future.value(0)
-        : PartRepository().list(tenantId!).then((value) => value.length),
-    builder: (context, snapshot) => _Metric(
-      icon: Icons.inventory_2_rounded,
-      color: const Color(0xFF6D5DFB),
-      label: 'Active parts',
-      value: snapshot.hasError
-          ? '0'
-          : snapshot.hasData
-          ? '${snapshot.data}'
-          : '…',
-      detail: snapshot.hasError
-          ? 'Tenant data could not be loaded'
-          : 'Available for production',
-    ),
-  );
+  Widget build(BuildContext context) {
+    final activeTenant = tenantId ?? (PlatformCapabilities.current().isWindows ? WindowsSession.companyId : null);
+    return FutureBuilder<int>(
+      future: activeTenant == null
+          ? Future.value(0)
+          : _getRepo(activeTenant).list(activeTenant).then((value) => value.length),
+      builder: (context, snapshot) => _Metric(
+        icon: Icons.inventory_2_rounded,
+        color: const Color(0xFF6D5DFB),
+        label: 'Active parts',
+        value: snapshot.hasError
+            ? '0'
+            : snapshot.hasData
+            ? '${snapshot.data}'
+            : '…',
+        detail: snapshot.hasError
+            ? 'Tenant data could not be loaded'
+            : 'Available for production',
+      ),
+    );
+  }
 }
 
 enum _LocalMetricSource { templates, printers }

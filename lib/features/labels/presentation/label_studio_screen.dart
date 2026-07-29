@@ -8,10 +8,12 @@ import 'package:printing/printing.dart';
 import '../../../features/authentication/presentation/session_controller.dart';
 import '../../../core/platform/platform_capabilities.dart';
 import '../../windows_desktop/application/windows_session.dart';
+import '../../windows_desktop/data/local_database.dart' show LocalDatabase;
 import '../../../features/printers/data/printing_browser_gateway.dart';
 import '../../../features/printers/domain/browser_printing.dart';
 import '../../../shared/widgets/barcode_view.dart';
 import '../application/production_activity.dart';
+import '../data/local_part_repository.dart';
 import '../data/part_repository.dart';
 
 class LabelStudioScreen extends ConsumerStatefulWidget {
@@ -24,9 +26,22 @@ class LabelStudioScreen extends ConsumerStatefulWidget {
 }
 
 class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
-  late final PartRepository repository = widget.repository ?? PartRepository();
+  late final PartRepository repository = _initRepository();
   late final BrowserPrintGateway gateway =
       widget.printGateway ?? const PrintingBrowserGateway();
+
+  /// Returns [LocalPartRepository] on Windows (offline SQLite) or
+  /// [CloudPartRepository] on every other platform.
+  PartRepository _initRepository() {
+    if (widget.repository != null) return widget.repository!;
+    if (PlatformCapabilities.current().isWindows) {
+      final companyId = WindowsSession.companyId;
+      if (companyId != null) {
+        return LocalPartRepository(LocalDatabase(companyId));
+      }
+    }
+    return CloudPartRepository();
+  }
   final search = TextEditingController();
   final partNumber = TextEditingController();
   final itemName = TextEditingController();
@@ -694,12 +709,14 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   };
 
   Future<void> _load() async {
-    final tenant = ref.read(sessionProvider).tenantId;
+    // Resolve tenant: prefer cloud session, fall back to Windows local login.
+    final tenant =
+        ref.read(sessionProvider).tenantId ?? WindowsSession.companyId;
     if (tenant == null) {
       setState(() {
         parts = const [];
         loading = false;
-        message = 'No local parts yet';
+        message = 'Sign in to load parts';
       });
       return;
     }
@@ -757,9 +774,11 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       _notice('Part number and item name are required');
       return;
     }
-    final tenant = ref.read(sessionProvider).tenantId;
+    // Resolve tenant: prefer cloud session, fall back to Windows local login.
+    final tenant =
+        ref.read(sessionProvider).tenantId ?? WindowsSession.companyId;
     if (tenant == null) {
-      _notice('Cloud account tenant is required for part master changes');
+      _notice('Please sign in before making part master changes');
       return;
     }
     setState(() => busy = true);
@@ -775,7 +794,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   }
 
   Future<void> _delete() async {
-    final tenant = ref.read(sessionProvider).tenantId;
+    // Resolve tenant: prefer cloud session, fall back to Windows local login.
+    final tenant =
+        ref.read(sessionProvider).tenantId ?? WindowsSession.companyId;
     if (tenant == null || selected == null) return;
     final confirmed =
         await showDialog<bool>(

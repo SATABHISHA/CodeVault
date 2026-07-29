@@ -33,10 +33,25 @@ class PartRecord {
   final int version;
 }
 
-class PartRepository {
-  PartRepository({ApiClient? client}) : _client = client ?? ApiClient();
+/// Abstract interface — implemented by [CloudPartRepository] (web/mobile) and
+/// [LocalPartRepository] (Windows offline).
+abstract interface class PartRepository {
+  Future<List<PartRecord>> list(String tenantId, {String search = ''});
+  Future<PartRecord> create(String tenantId, Map<String, dynamic> data);
+  Future<PartRecord> update(
+    String tenantId,
+    PartRecord part,
+    Map<String, dynamic> data,
+  );
+  Future<void> delete(String tenantId, String id);
+}
+
+/// Cloud (Laravel API) implementation. Used on Web and Mobile.
+class CloudPartRepository implements PartRepository {
+  CloudPartRepository({ApiClient? client}) : _client = client ?? ApiClient();
   final ApiClient _client;
 
+  @override
   Future<List<PartRecord>> list(String tenantId, {String search = ''}) async {
     final response = await _client.dio.get<Map<String, dynamic>>(
       '/tenants/$tenantId/parts',
@@ -48,6 +63,7 @@ class PartRepository {
         .toList();
   }
 
+  @override
   Future<PartRecord> create(String tenantId, Map<String, dynamic> data) async {
     final response = await _client.dio.post<Map<String, dynamic>>(
       '/tenants/$tenantId/parts',
@@ -56,6 +72,7 @@ class PartRepository {
     return PartRecord.fromJson(response.data!['data'] as Map<String, dynamic>);
   }
 
+  @override
   Future<PartRecord> update(
     String tenantId,
     PartRecord part,
@@ -68,6 +85,7 @@ class PartRepository {
     return PartRecord.fromJson(response.data!['data'] as Map<String, dynamic>);
   }
 
+  @override
   Future<void> delete(String tenantId, String id) =>
       _client.dio.delete<void>('/tenants/$tenantId/parts/$id').then((_) {});
 }

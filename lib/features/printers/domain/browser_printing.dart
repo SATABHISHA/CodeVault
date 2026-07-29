@@ -51,7 +51,6 @@ class BrowserPdfGenerator {
 
     // How many sticker rows fit on one A4 page?
     final rowsPerPage = (a4H / hPt).floor().clamp(1, 9999);
-    final stickersPerPage = rowsPerPage * label.stickersPerRow;
 
     // ── Dynamic font scaling based on label height ───────────────────────────
     // Scale fonts so they always fit within the label, regardless of size.
