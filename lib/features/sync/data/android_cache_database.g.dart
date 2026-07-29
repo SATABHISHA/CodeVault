@@ -4774,6 +4774,726 @@ class ManagedRequestDraftsCompanion
   }
 }
 
+class $LocalReceiptsTable extends LocalReceipts
+    with TableInfo<$LocalReceiptsTable, LocalReceipt> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalReceiptsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _tenantIdMeta = const VerificationMeta(
+    'tenantId',
+  );
+  @override
+  late final GeneratedColumn<String> tenantId = GeneratedColumn<String>(
+    'tenant_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _receiptNumberMeta = const VerificationMeta(
+    'receiptNumber',
+  );
+  @override
+  late final GeneratedColumn<String> receiptNumber = GeneratedColumn<String>(
+    'receipt_number',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _dateMeta = const VerificationMeta('date');
+  @override
+  late final GeneratedColumn<DateTime> date = GeneratedColumn<DateTime>(
+    'date',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _baseAmountMeta = const VerificationMeta(
+    'baseAmount',
+  );
+  @override
+  late final GeneratedColumn<double> baseAmount = GeneratedColumn<double>(
+    'base_amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isGstBillingMeta = const VerificationMeta(
+    'isGstBilling',
+  );
+  @override
+  late final GeneratedColumn<bool> isGstBilling = GeneratedColumn<bool>(
+    'is_gst_billing',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_gst_billing" IN (0, 1))',
+    ),
+  );
+  static const VerificationMeta _companyGstMeta = const VerificationMeta(
+    'companyGst',
+  );
+  @override
+  late final GeneratedColumn<String> companyGst = GeneratedColumn<String>(
+    'company_gst',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _clientGstMeta = const VerificationMeta(
+    'clientGst',
+  );
+  @override
+  late final GeneratedColumn<String> clientGst = GeneratedColumn<String>(
+    'client_gst',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _sgstMeta = const VerificationMeta('sgst');
+  @override
+  late final GeneratedColumn<double> sgst = GeneratedColumn<double>(
+    'sgst',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _cgstMeta = const VerificationMeta('cgst');
+  @override
+  late final GeneratedColumn<double> cgst = GeneratedColumn<double>(
+    'cgst',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _igstMeta = const VerificationMeta('igst');
+  @override
+  late final GeneratedColumn<double> igst = GeneratedColumn<double>(
+    'igst',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _totalAmountMeta = const VerificationMeta(
+    'totalAmount',
+  );
+  @override
+  late final GeneratedColumn<double> totalAmount = GeneratedColumn<double>(
+    'total_amount',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    tenantId,
+    receiptNumber,
+    date,
+    baseAmount,
+    isGstBilling,
+    companyGst,
+    clientGst,
+    sgst,
+    cgst,
+    igst,
+    totalAmount,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_receipts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalReceipt> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('tenant_id')) {
+      context.handle(
+        _tenantIdMeta,
+        tenantId.isAcceptableOrUnknown(data['tenant_id']!, _tenantIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_tenantIdMeta);
+    }
+    if (data.containsKey('receipt_number')) {
+      context.handle(
+        _receiptNumberMeta,
+        receiptNumber.isAcceptableOrUnknown(
+          data['receipt_number']!,
+          _receiptNumberMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_receiptNumberMeta);
+    }
+    if (data.containsKey('date')) {
+      context.handle(
+        _dateMeta,
+        date.isAcceptableOrUnknown(data['date']!, _dateMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_dateMeta);
+    }
+    if (data.containsKey('base_amount')) {
+      context.handle(
+        _baseAmountMeta,
+        baseAmount.isAcceptableOrUnknown(data['base_amount']!, _baseAmountMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_baseAmountMeta);
+    }
+    if (data.containsKey('is_gst_billing')) {
+      context.handle(
+        _isGstBillingMeta,
+        isGstBilling.isAcceptableOrUnknown(
+          data['is_gst_billing']!,
+          _isGstBillingMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_isGstBillingMeta);
+    }
+    if (data.containsKey('company_gst')) {
+      context.handle(
+        _companyGstMeta,
+        companyGst.isAcceptableOrUnknown(data['company_gst']!, _companyGstMeta),
+      );
+    }
+    if (data.containsKey('client_gst')) {
+      context.handle(
+        _clientGstMeta,
+        clientGst.isAcceptableOrUnknown(data['client_gst']!, _clientGstMeta),
+      );
+    }
+    if (data.containsKey('sgst')) {
+      context.handle(
+        _sgstMeta,
+        sgst.isAcceptableOrUnknown(data['sgst']!, _sgstMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_sgstMeta);
+    }
+    if (data.containsKey('cgst')) {
+      context.handle(
+        _cgstMeta,
+        cgst.isAcceptableOrUnknown(data['cgst']!, _cgstMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_cgstMeta);
+    }
+    if (data.containsKey('igst')) {
+      context.handle(
+        _igstMeta,
+        igst.isAcceptableOrUnknown(data['igst']!, _igstMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_igstMeta);
+    }
+    if (data.containsKey('total_amount')) {
+      context.handle(
+        _totalAmountMeta,
+        totalAmount.isAcceptableOrUnknown(
+          data['total_amount']!,
+          _totalAmountMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_totalAmountMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {tenantId, id};
+  @override
+  LocalReceipt map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalReceipt(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      tenantId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tenant_id'],
+      )!,
+      receiptNumber: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}receipt_number'],
+      )!,
+      date: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}date'],
+      )!,
+      baseAmount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}base_amount'],
+      )!,
+      isGstBilling: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_gst_billing'],
+      )!,
+      companyGst: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}company_gst'],
+      ),
+      clientGst: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}client_gst'],
+      ),
+      sgst: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}sgst'],
+      )!,
+      cgst: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}cgst'],
+      )!,
+      igst: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}igst'],
+      )!,
+      totalAmount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}total_amount'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalReceiptsTable createAlias(String alias) {
+    return $LocalReceiptsTable(attachedDatabase, alias);
+  }
+}
+
+class LocalReceipt extends DataClass implements Insertable<LocalReceipt> {
+  final String id;
+  final String tenantId;
+  final String receiptNumber;
+  final DateTime date;
+  final double baseAmount;
+  final bool isGstBilling;
+  final String? companyGst;
+  final String? clientGst;
+  final double sgst;
+  final double cgst;
+  final double igst;
+  final double totalAmount;
+  const LocalReceipt({
+    required this.id,
+    required this.tenantId,
+    required this.receiptNumber,
+    required this.date,
+    required this.baseAmount,
+    required this.isGstBilling,
+    this.companyGst,
+    this.clientGst,
+    required this.sgst,
+    required this.cgst,
+    required this.igst,
+    required this.totalAmount,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['tenant_id'] = Variable<String>(tenantId);
+    map['receipt_number'] = Variable<String>(receiptNumber);
+    map['date'] = Variable<DateTime>(date);
+    map['base_amount'] = Variable<double>(baseAmount);
+    map['is_gst_billing'] = Variable<bool>(isGstBilling);
+    if (!nullToAbsent || companyGst != null) {
+      map['company_gst'] = Variable<String>(companyGst);
+    }
+    if (!nullToAbsent || clientGst != null) {
+      map['client_gst'] = Variable<String>(clientGst);
+    }
+    map['sgst'] = Variable<double>(sgst);
+    map['cgst'] = Variable<double>(cgst);
+    map['igst'] = Variable<double>(igst);
+    map['total_amount'] = Variable<double>(totalAmount);
+    return map;
+  }
+
+  LocalReceiptsCompanion toCompanion(bool nullToAbsent) {
+    return LocalReceiptsCompanion(
+      id: Value(id),
+      tenantId: Value(tenantId),
+      receiptNumber: Value(receiptNumber),
+      date: Value(date),
+      baseAmount: Value(baseAmount),
+      isGstBilling: Value(isGstBilling),
+      companyGst: companyGst == null && nullToAbsent
+          ? const Value.absent()
+          : Value(companyGst),
+      clientGst: clientGst == null && nullToAbsent
+          ? const Value.absent()
+          : Value(clientGst),
+      sgst: Value(sgst),
+      cgst: Value(cgst),
+      igst: Value(igst),
+      totalAmount: Value(totalAmount),
+    );
+  }
+
+  factory LocalReceipt.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalReceipt(
+      id: serializer.fromJson<String>(json['id']),
+      tenantId: serializer.fromJson<String>(json['tenantId']),
+      receiptNumber: serializer.fromJson<String>(json['receiptNumber']),
+      date: serializer.fromJson<DateTime>(json['date']),
+      baseAmount: serializer.fromJson<double>(json['baseAmount']),
+      isGstBilling: serializer.fromJson<bool>(json['isGstBilling']),
+      companyGst: serializer.fromJson<String?>(json['companyGst']),
+      clientGst: serializer.fromJson<String?>(json['clientGst']),
+      sgst: serializer.fromJson<double>(json['sgst']),
+      cgst: serializer.fromJson<double>(json['cgst']),
+      igst: serializer.fromJson<double>(json['igst']),
+      totalAmount: serializer.fromJson<double>(json['totalAmount']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'tenantId': serializer.toJson<String>(tenantId),
+      'receiptNumber': serializer.toJson<String>(receiptNumber),
+      'date': serializer.toJson<DateTime>(date),
+      'baseAmount': serializer.toJson<double>(baseAmount),
+      'isGstBilling': serializer.toJson<bool>(isGstBilling),
+      'companyGst': serializer.toJson<String?>(companyGst),
+      'clientGst': serializer.toJson<String?>(clientGst),
+      'sgst': serializer.toJson<double>(sgst),
+      'cgst': serializer.toJson<double>(cgst),
+      'igst': serializer.toJson<double>(igst),
+      'totalAmount': serializer.toJson<double>(totalAmount),
+    };
+  }
+
+  LocalReceipt copyWith({
+    String? id,
+    String? tenantId,
+    String? receiptNumber,
+    DateTime? date,
+    double? baseAmount,
+    bool? isGstBilling,
+    Value<String?> companyGst = const Value.absent(),
+    Value<String?> clientGst = const Value.absent(),
+    double? sgst,
+    double? cgst,
+    double? igst,
+    double? totalAmount,
+  }) => LocalReceipt(
+    id: id ?? this.id,
+    tenantId: tenantId ?? this.tenantId,
+    receiptNumber: receiptNumber ?? this.receiptNumber,
+    date: date ?? this.date,
+    baseAmount: baseAmount ?? this.baseAmount,
+    isGstBilling: isGstBilling ?? this.isGstBilling,
+    companyGst: companyGst.present ? companyGst.value : this.companyGst,
+    clientGst: clientGst.present ? clientGst.value : this.clientGst,
+    sgst: sgst ?? this.sgst,
+    cgst: cgst ?? this.cgst,
+    igst: igst ?? this.igst,
+    totalAmount: totalAmount ?? this.totalAmount,
+  );
+  LocalReceipt copyWithCompanion(LocalReceiptsCompanion data) {
+    return LocalReceipt(
+      id: data.id.present ? data.id.value : this.id,
+      tenantId: data.tenantId.present ? data.tenantId.value : this.tenantId,
+      receiptNumber: data.receiptNumber.present
+          ? data.receiptNumber.value
+          : this.receiptNumber,
+      date: data.date.present ? data.date.value : this.date,
+      baseAmount: data.baseAmount.present
+          ? data.baseAmount.value
+          : this.baseAmount,
+      isGstBilling: data.isGstBilling.present
+          ? data.isGstBilling.value
+          : this.isGstBilling,
+      companyGst: data.companyGst.present
+          ? data.companyGst.value
+          : this.companyGst,
+      clientGst: data.clientGst.present ? data.clientGst.value : this.clientGst,
+      sgst: data.sgst.present ? data.sgst.value : this.sgst,
+      cgst: data.cgst.present ? data.cgst.value : this.cgst,
+      igst: data.igst.present ? data.igst.value : this.igst,
+      totalAmount: data.totalAmount.present
+          ? data.totalAmount.value
+          : this.totalAmount,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalReceipt(')
+          ..write('id: $id, ')
+          ..write('tenantId: $tenantId, ')
+          ..write('receiptNumber: $receiptNumber, ')
+          ..write('date: $date, ')
+          ..write('baseAmount: $baseAmount, ')
+          ..write('isGstBilling: $isGstBilling, ')
+          ..write('companyGst: $companyGst, ')
+          ..write('clientGst: $clientGst, ')
+          ..write('sgst: $sgst, ')
+          ..write('cgst: $cgst, ')
+          ..write('igst: $igst, ')
+          ..write('totalAmount: $totalAmount')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    tenantId,
+    receiptNumber,
+    date,
+    baseAmount,
+    isGstBilling,
+    companyGst,
+    clientGst,
+    sgst,
+    cgst,
+    igst,
+    totalAmount,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalReceipt &&
+          other.id == this.id &&
+          other.tenantId == this.tenantId &&
+          other.receiptNumber == this.receiptNumber &&
+          other.date == this.date &&
+          other.baseAmount == this.baseAmount &&
+          other.isGstBilling == this.isGstBilling &&
+          other.companyGst == this.companyGst &&
+          other.clientGst == this.clientGst &&
+          other.sgst == this.sgst &&
+          other.cgst == this.cgst &&
+          other.igst == this.igst &&
+          other.totalAmount == this.totalAmount);
+}
+
+class LocalReceiptsCompanion extends UpdateCompanion<LocalReceipt> {
+  final Value<String> id;
+  final Value<String> tenantId;
+  final Value<String> receiptNumber;
+  final Value<DateTime> date;
+  final Value<double> baseAmount;
+  final Value<bool> isGstBilling;
+  final Value<String?> companyGst;
+  final Value<String?> clientGst;
+  final Value<double> sgst;
+  final Value<double> cgst;
+  final Value<double> igst;
+  final Value<double> totalAmount;
+  final Value<int> rowid;
+  const LocalReceiptsCompanion({
+    this.id = const Value.absent(),
+    this.tenantId = const Value.absent(),
+    this.receiptNumber = const Value.absent(),
+    this.date = const Value.absent(),
+    this.baseAmount = const Value.absent(),
+    this.isGstBilling = const Value.absent(),
+    this.companyGst = const Value.absent(),
+    this.clientGst = const Value.absent(),
+    this.sgst = const Value.absent(),
+    this.cgst = const Value.absent(),
+    this.igst = const Value.absent(),
+    this.totalAmount = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalReceiptsCompanion.insert({
+    required String id,
+    required String tenantId,
+    required String receiptNumber,
+    required DateTime date,
+    required double baseAmount,
+    required bool isGstBilling,
+    this.companyGst = const Value.absent(),
+    this.clientGst = const Value.absent(),
+    required double sgst,
+    required double cgst,
+    required double igst,
+    required double totalAmount,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       tenantId = Value(tenantId),
+       receiptNumber = Value(receiptNumber),
+       date = Value(date),
+       baseAmount = Value(baseAmount),
+       isGstBilling = Value(isGstBilling),
+       sgst = Value(sgst),
+       cgst = Value(cgst),
+       igst = Value(igst),
+       totalAmount = Value(totalAmount);
+  static Insertable<LocalReceipt> custom({
+    Expression<String>? id,
+    Expression<String>? tenantId,
+    Expression<String>? receiptNumber,
+    Expression<DateTime>? date,
+    Expression<double>? baseAmount,
+    Expression<bool>? isGstBilling,
+    Expression<String>? companyGst,
+    Expression<String>? clientGst,
+    Expression<double>? sgst,
+    Expression<double>? cgst,
+    Expression<double>? igst,
+    Expression<double>? totalAmount,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (tenantId != null) 'tenant_id': tenantId,
+      if (receiptNumber != null) 'receipt_number': receiptNumber,
+      if (date != null) 'date': date,
+      if (baseAmount != null) 'base_amount': baseAmount,
+      if (isGstBilling != null) 'is_gst_billing': isGstBilling,
+      if (companyGst != null) 'company_gst': companyGst,
+      if (clientGst != null) 'client_gst': clientGst,
+      if (sgst != null) 'sgst': sgst,
+      if (cgst != null) 'cgst': cgst,
+      if (igst != null) 'igst': igst,
+      if (totalAmount != null) 'total_amount': totalAmount,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalReceiptsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? tenantId,
+    Value<String>? receiptNumber,
+    Value<DateTime>? date,
+    Value<double>? baseAmount,
+    Value<bool>? isGstBilling,
+    Value<String?>? companyGst,
+    Value<String?>? clientGst,
+    Value<double>? sgst,
+    Value<double>? cgst,
+    Value<double>? igst,
+    Value<double>? totalAmount,
+    Value<int>? rowid,
+  }) {
+    return LocalReceiptsCompanion(
+      id: id ?? this.id,
+      tenantId: tenantId ?? this.tenantId,
+      receiptNumber: receiptNumber ?? this.receiptNumber,
+      date: date ?? this.date,
+      baseAmount: baseAmount ?? this.baseAmount,
+      isGstBilling: isGstBilling ?? this.isGstBilling,
+      companyGst: companyGst ?? this.companyGst,
+      clientGst: clientGst ?? this.clientGst,
+      sgst: sgst ?? this.sgst,
+      cgst: cgst ?? this.cgst,
+      igst: igst ?? this.igst,
+      totalAmount: totalAmount ?? this.totalAmount,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (tenantId.present) {
+      map['tenant_id'] = Variable<String>(tenantId.value);
+    }
+    if (receiptNumber.present) {
+      map['receipt_number'] = Variable<String>(receiptNumber.value);
+    }
+    if (date.present) {
+      map['date'] = Variable<DateTime>(date.value);
+    }
+    if (baseAmount.present) {
+      map['base_amount'] = Variable<double>(baseAmount.value);
+    }
+    if (isGstBilling.present) {
+      map['is_gst_billing'] = Variable<bool>(isGstBilling.value);
+    }
+    if (companyGst.present) {
+      map['company_gst'] = Variable<String>(companyGst.value);
+    }
+    if (clientGst.present) {
+      map['client_gst'] = Variable<String>(clientGst.value);
+    }
+    if (sgst.present) {
+      map['sgst'] = Variable<double>(sgst.value);
+    }
+    if (cgst.present) {
+      map['cgst'] = Variable<double>(cgst.value);
+    }
+    if (igst.present) {
+      map['igst'] = Variable<double>(igst.value);
+    }
+    if (totalAmount.present) {
+      map['total_amount'] = Variable<double>(totalAmount.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalReceiptsCompanion(')
+          ..write('id: $id, ')
+          ..write('tenantId: $tenantId, ')
+          ..write('receiptNumber: $receiptNumber, ')
+          ..write('date: $date, ')
+          ..write('baseAmount: $baseAmount, ')
+          ..write('isGstBilling: $isGstBilling, ')
+          ..write('companyGst: $companyGst, ')
+          ..write('clientGst: $clientGst, ')
+          ..write('sgst: $sgst, ')
+          ..write('cgst: $cgst, ')
+          ..write('igst: $igst, ')
+          ..write('totalAmount: $totalAmount, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AndroidCacheDatabase extends GeneratedDatabase {
   _$AndroidCacheDatabase(QueryExecutor e) : super(e);
   $AndroidCacheDatabaseManager get managers =>
@@ -4794,6 +5514,7 @@ abstract class _$AndroidCacheDatabase extends GeneratedDatabase {
       $LocalLabelPreviewsTable(this);
   late final $ManagedRequestDraftsTable managedRequestDrafts =
       $ManagedRequestDraftsTable(this);
+  late final $LocalReceiptsTable localReceipts = $LocalReceiptsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -4808,6 +5529,7 @@ abstract class _$AndroidCacheDatabase extends GeneratedDatabase {
     offlinePrintLogs,
     localLabelPreviews,
     managedRequestDrafts,
+    localReceipts,
   ];
 }
 
@@ -7309,6 +8031,359 @@ typedef $$ManagedRequestDraftsTableProcessedTableManager =
       ManagedRequestDraft,
       PrefetchHooks Function()
     >;
+typedef $$LocalReceiptsTableCreateCompanionBuilder =
+    LocalReceiptsCompanion Function({
+      required String id,
+      required String tenantId,
+      required String receiptNumber,
+      required DateTime date,
+      required double baseAmount,
+      required bool isGstBilling,
+      Value<String?> companyGst,
+      Value<String?> clientGst,
+      required double sgst,
+      required double cgst,
+      required double igst,
+      required double totalAmount,
+      Value<int> rowid,
+    });
+typedef $$LocalReceiptsTableUpdateCompanionBuilder =
+    LocalReceiptsCompanion Function({
+      Value<String> id,
+      Value<String> tenantId,
+      Value<String> receiptNumber,
+      Value<DateTime> date,
+      Value<double> baseAmount,
+      Value<bool> isGstBilling,
+      Value<String?> companyGst,
+      Value<String?> clientGst,
+      Value<double> sgst,
+      Value<double> cgst,
+      Value<double> igst,
+      Value<double> totalAmount,
+      Value<int> rowid,
+    });
+
+class $$LocalReceiptsTableFilterComposer
+    extends Composer<_$AndroidCacheDatabase, $LocalReceiptsTable> {
+  $$LocalReceiptsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tenantId => $composableBuilder(
+    column: $table.tenantId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get receiptNumber => $composableBuilder(
+    column: $table.receiptNumber,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get baseAmount => $composableBuilder(
+    column: $table.baseAmount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isGstBilling => $composableBuilder(
+    column: $table.isGstBilling,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get companyGst => $composableBuilder(
+    column: $table.companyGst,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get clientGst => $composableBuilder(
+    column: $table.clientGst,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get sgst => $composableBuilder(
+    column: $table.sgst,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get cgst => $composableBuilder(
+    column: $table.cgst,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get igst => $composableBuilder(
+    column: $table.igst,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get totalAmount => $composableBuilder(
+    column: $table.totalAmount,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalReceiptsTableOrderingComposer
+    extends Composer<_$AndroidCacheDatabase, $LocalReceiptsTable> {
+  $$LocalReceiptsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get tenantId => $composableBuilder(
+    column: $table.tenantId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get receiptNumber => $composableBuilder(
+    column: $table.receiptNumber,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get date => $composableBuilder(
+    column: $table.date,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get baseAmount => $composableBuilder(
+    column: $table.baseAmount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isGstBilling => $composableBuilder(
+    column: $table.isGstBilling,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get companyGst => $composableBuilder(
+    column: $table.companyGst,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get clientGst => $composableBuilder(
+    column: $table.clientGst,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get sgst => $composableBuilder(
+    column: $table.sgst,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get cgst => $composableBuilder(
+    column: $table.cgst,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get igst => $composableBuilder(
+    column: $table.igst,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get totalAmount => $composableBuilder(
+    column: $table.totalAmount,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalReceiptsTableAnnotationComposer
+    extends Composer<_$AndroidCacheDatabase, $LocalReceiptsTable> {
+  $$LocalReceiptsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get tenantId =>
+      $composableBuilder(column: $table.tenantId, builder: (column) => column);
+
+  GeneratedColumn<String> get receiptNumber => $composableBuilder(
+    column: $table.receiptNumber,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get date =>
+      $composableBuilder(column: $table.date, builder: (column) => column);
+
+  GeneratedColumn<double> get baseAmount => $composableBuilder(
+    column: $table.baseAmount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get isGstBilling => $composableBuilder(
+    column: $table.isGstBilling,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get companyGst => $composableBuilder(
+    column: $table.companyGst,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get clientGst =>
+      $composableBuilder(column: $table.clientGst, builder: (column) => column);
+
+  GeneratedColumn<double> get sgst =>
+      $composableBuilder(column: $table.sgst, builder: (column) => column);
+
+  GeneratedColumn<double> get cgst =>
+      $composableBuilder(column: $table.cgst, builder: (column) => column);
+
+  GeneratedColumn<double> get igst =>
+      $composableBuilder(column: $table.igst, builder: (column) => column);
+
+  GeneratedColumn<double> get totalAmount => $composableBuilder(
+    column: $table.totalAmount,
+    builder: (column) => column,
+  );
+}
+
+class $$LocalReceiptsTableTableManager
+    extends
+        RootTableManager<
+          _$AndroidCacheDatabase,
+          $LocalReceiptsTable,
+          LocalReceipt,
+          $$LocalReceiptsTableFilterComposer,
+          $$LocalReceiptsTableOrderingComposer,
+          $$LocalReceiptsTableAnnotationComposer,
+          $$LocalReceiptsTableCreateCompanionBuilder,
+          $$LocalReceiptsTableUpdateCompanionBuilder,
+          (
+            LocalReceipt,
+            BaseReferences<
+              _$AndroidCacheDatabase,
+              $LocalReceiptsTable,
+              LocalReceipt
+            >,
+          ),
+          LocalReceipt,
+          PrefetchHooks Function()
+        > {
+  $$LocalReceiptsTableTableManager(
+    _$AndroidCacheDatabase db,
+    $LocalReceiptsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalReceiptsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$LocalReceiptsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$LocalReceiptsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> tenantId = const Value.absent(),
+                Value<String> receiptNumber = const Value.absent(),
+                Value<DateTime> date = const Value.absent(),
+                Value<double> baseAmount = const Value.absent(),
+                Value<bool> isGstBilling = const Value.absent(),
+                Value<String?> companyGst = const Value.absent(),
+                Value<String?> clientGst = const Value.absent(),
+                Value<double> sgst = const Value.absent(),
+                Value<double> cgst = const Value.absent(),
+                Value<double> igst = const Value.absent(),
+                Value<double> totalAmount = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalReceiptsCompanion(
+                id: id,
+                tenantId: tenantId,
+                receiptNumber: receiptNumber,
+                date: date,
+                baseAmount: baseAmount,
+                isGstBilling: isGstBilling,
+                companyGst: companyGst,
+                clientGst: clientGst,
+                sgst: sgst,
+                cgst: cgst,
+                igst: igst,
+                totalAmount: totalAmount,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String tenantId,
+                required String receiptNumber,
+                required DateTime date,
+                required double baseAmount,
+                required bool isGstBilling,
+                Value<String?> companyGst = const Value.absent(),
+                Value<String?> clientGst = const Value.absent(),
+                required double sgst,
+                required double cgst,
+                required double igst,
+                required double totalAmount,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalReceiptsCompanion.insert(
+                id: id,
+                tenantId: tenantId,
+                receiptNumber: receiptNumber,
+                date: date,
+                baseAmount: baseAmount,
+                isGstBilling: isGstBilling,
+                companyGst: companyGst,
+                clientGst: clientGst,
+                sgst: sgst,
+                cgst: cgst,
+                igst: igst,
+                totalAmount: totalAmount,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalReceiptsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AndroidCacheDatabase,
+      $LocalReceiptsTable,
+      LocalReceipt,
+      $$LocalReceiptsTableFilterComposer,
+      $$LocalReceiptsTableOrderingComposer,
+      $$LocalReceiptsTableAnnotationComposer,
+      $$LocalReceiptsTableCreateCompanionBuilder,
+      $$LocalReceiptsTableUpdateCompanionBuilder,
+      (
+        LocalReceipt,
+        BaseReferences<
+          _$AndroidCacheDatabase,
+          $LocalReceiptsTable,
+          LocalReceipt
+        >,
+      ),
+      LocalReceipt,
+      PrefetchHooks Function()
+    >;
 
 class $AndroidCacheDatabaseManager {
   final _$AndroidCacheDatabase _db;
@@ -7334,4 +8409,6 @@ class $AndroidCacheDatabaseManager {
       $$LocalLabelPreviewsTableTableManager(_db, _db.localLabelPreviews);
   $$ManagedRequestDraftsTableTableManager get managedRequestDrafts =>
       $$ManagedRequestDraftsTableTableManager(_db, _db.managedRequestDrafts);
+  $$LocalReceiptsTableTableManager get localReceipts =>
+      $$LocalReceiptsTableTableManager(_db, _db.localReceipts);
 }

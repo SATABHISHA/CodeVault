@@ -18,7 +18,6 @@ class PlatformCapabilities {
   bool get isWindows => platform == AppPlatform.windows;
   bool get isAndroid => platform == AppPlatform.android;
   bool get isWeb => platform == AppPlatform.web;
-  bool get supportsManagedCloudRequests => isAndroid || isWeb;
   bool get supportsLocalBackup => isWindows;
   bool get supportsWirelessPrinting => isAndroid;
   bool get supportsBrowserPrint => isWeb;

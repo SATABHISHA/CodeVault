@@ -132,12 +132,7 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
                   children: [
                     Text('Printer: ${printer.name}'),
                     Text('Status: $status'),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Print with name'),
-                      value: includeName,
-                      onChanged: (value) => setState(() => includeName = value),
-                    ),
+                    const SizedBox(height: 10),
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
@@ -146,15 +141,16 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
                           onPressed: _testPrint,
                           child: const Text('Test print'),
                         ),
+                        FilledButton.tonalIcon(
+                          onPressed: () => _print(withName: false),
+                          icon: const Icon(Icons.print_disabled),
+                          label: const Text('Print without name'),
+                        ),
                         FilledButton.icon(
                           key: const Key('offline-print'),
-                          onPressed: _print,
+                          onPressed: () => _print(withName: true),
                           icon: const Icon(Icons.print),
-                          label: Text(
-                            includeName
-                                ? 'Print with name'
-                                : 'Print without name',
-                          ),
+                          label: const Text('Print with name'),
                         ),
                       ],
                     ),
@@ -194,12 +190,13 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
     if (mounted) setState(() => status = 'Test successful');
   }
 
-  Future<void> _print() async {
+  Future<void> _print({bool? withName}) async {
     final copies = int.tryParse(quantity.text) ?? 0;
+    final include = withName ?? includeName;
     final receipt = await printer.print(
       PrintRequest(
         jobId: const Uuid().v4(),
-        content: includeName ? '${part.text}\n$content' : content,
+        content: include ? '${part.text}\n$content' : content,
         copies: copies,
       ),
     );

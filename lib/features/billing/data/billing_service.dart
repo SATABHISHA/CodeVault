@@ -25,6 +25,9 @@ class BillingService {
   Future<void> recordPayment(String tenant, Map<String, dynamic> data) async =>
       _client.dio.post<void>('/tenants/$tenant/payments', data: data);
 
+  Future<void> deletePayment(String tenant, String paymentId) async =>
+      _client.dio.delete<void>('/tenants/$tenant/payments/$paymentId');
+
   Future<Map<String, dynamic>?> smtp() async {
     final response = await _client.dio.get<Map<String, dynamic>>(
       '/platform/smtp',

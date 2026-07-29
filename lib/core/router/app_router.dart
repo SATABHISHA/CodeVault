@@ -12,7 +12,6 @@ import 'package:codevault/features/settings/presentation/about_screen.dart';
 import 'package:codevault/features/settings/presentation/profile_screen.dart';
 import 'package:codevault/features/support/presentation/support_screen.dart';
 import 'package:codevault/features/printers/presentation/android_printer_screen.dart';
-import 'package:codevault/features/sync/presentation/sync_status_screen.dart';
 import 'package:codevault/features/windows_desktop/presentation/recovery_screen.dart';
 import 'package:codevault/features/windows_desktop/presentation/windows_entry_screen.dart';
 import 'package:codevault/features/windows_desktop/presentation/user_management_screen.dart';
@@ -62,10 +61,6 @@ final appRouterProvider = Provider<GoRouter>(
             builder: (context, state) => const LabelStudioScreen(),
           ),
           GoRoute(
-            path: '/sync',
-            builder: (context, state) => const SyncStatusScreen(),
-          ),
-          GoRoute(
             path: '/windows/operations',
             builder: (context, state) => const LabelStudioScreen(),
           ),
@@ -91,7 +86,7 @@ final appRouterProvider = Provider<GoRouter>(
           ),
           GoRoute(
             path: '/backup',
-            builder: (context, state) => const PermissionAwareBackupScreen(),
+            builder: (context, state) => const BackupScreen(),
           ),
           GoRoute(
             path: '/support',

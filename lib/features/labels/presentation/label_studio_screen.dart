@@ -14,6 +14,7 @@ import '../../../features/printers/domain/browser_printing.dart';
 import '../../../shared/widgets/barcode_view.dart';
 import '../application/production_activity.dart';
 import '../data/local_part_repository.dart';
+import '../data/web_local_part_repository.dart';
 import '../data/part_repository.dart';
 
 class LabelStudioScreen extends ConsumerStatefulWidget {
@@ -31,7 +32,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       widget.printGateway ?? const PrintingBrowserGateway();
 
   /// Returns [LocalPartRepository] on Windows (offline SQLite) or
-  /// [CloudPartRepository] on every other platform.
+  /// [WebLocalPartRepository] on every other platform.
   PartRepository _initRepository() {
     if (widget.repository != null) return widget.repository!;
     if (PlatformCapabilities.current().isWindows) {
@@ -40,7 +41,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
         return LocalPartRepository(LocalDatabase(companyId));
       }
     }
-    return CloudPartRepository();
+    return WebLocalPartRepository();
   }
   final search = TextEditingController();
   final partNumber = TextEditingController();
@@ -339,7 +340,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
               child: _printersLoaded
                   ? _availablePrinters.isEmpty
                       ? DropdownButtonFormField<String>(
-                          value: 'System Default',
+                          initialValue: 'System Default',
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Printer port'),
                           items: const [
@@ -351,7 +352,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                           onChanged: null,
                         )
                       : DropdownButtonFormField<Printer>(
-                          value: _selectedPrinter,
+                          initialValue: _selectedPrinter,
                           isExpanded: true,
                           decoration: const InputDecoration(labelText: 'Printer port'),
                           items: _availablePrinters
@@ -599,23 +600,26 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 14),
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.end,
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: busy ? null : _generate,
-                  icon: const Icon(Icons.visibility_outlined),
-                  label: const Text('Display PDF'),
-                ),
+              OutlinedButton.icon(
+                onPressed: busy ? null : () => _generate(),
+                icon: const Icon(Icons.visibility_outlined),
+                label: const Text('Display PDF'),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton.icon(
-                  key: const Key('production-print'),
-                  onPressed: busy ? null : _print,
-                  icon: const Icon(Icons.print),
-                  label: Text(includeName ? 'Print with name' : 'Print'),
-                ),
+              FilledButton.tonalIcon(
+                onPressed: busy ? null : () => _print(withName: false),
+                icon: const Icon(Icons.print_disabled),
+                label: const Text('Print without name'),
+              ),
+              FilledButton.icon(
+                key: const Key('production-print'),
+                onPressed: busy ? null : () => _print(withName: true),
+                icon: const Icon(Icons.print),
+                label: const Text('Print with name'),
               ),
             ],
           ),
@@ -830,7 +834,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     }
   }
 
-  BrowserLabelDocument get _document {
+  BrowserLabelDocument _getDocument(bool withName) {
     final size = sizes[labelSize]!;
     return BrowserLabelDocument(
       title: 'PART NO: ${partNumber.text}',
@@ -838,7 +842,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       widthMm: size.$1,
       heightMm: size.$2,
       symbology: symbology,
-      itemName: includeName ? itemName.text : '',
+      itemName: withName ? itemName.text : '',
       model: model.text,
       company: companyName.text.trim(),
       companyAddress: companyAddress.text.trim(),
@@ -848,14 +852,14 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     );
   }
 
-  Future<void> _generate() async {
+  Future<void> _generate({bool? withName}) async {
     if (partNumber.text.trim().isEmpty) {
       _notice('Select or enter a part first');
       return;
     }
     setState(() => busy = true);
     try {
-      final bytes = await const BrowserPdfGenerator().generate(_document);
+      final bytes = await const BrowserPdfGenerator().generate(_getDocument(withName ?? includeName));
       await gateway.download(bytes, 'codevault-${partNumber.text}.pdf');
       _notice('Label PDF generated');
     } catch (error) {
@@ -865,7 +869,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     }
   }
 
-  Future<void> _print() async {
+  Future<void> _print({bool? withName}) async {
     final copies = int.tryParse(quantity.text) ?? 0;
     if (partNumber.text.trim().isEmpty || copies < 1) {
       _notice('Select a part and enter a valid print quantity');
@@ -873,7 +877,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     }
     setState(() => busy = true);
     try {
-      final bytes = await const BrowserPdfGenerator().generate(_document);
+      final bytes = await const BrowserPdfGenerator().generate(_getDocument(withName ?? includeName));
       if (_selectedPrinter != null) {
         await Printing.directPrintPdf(
           printer: _selectedPrinter!,

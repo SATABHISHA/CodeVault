@@ -158,6 +158,23 @@ class BackupReports extends Table {
   Set<Column<Object>> get primaryKey => {id};
 }
 
+class LocalReceipts extends Table {
+  TextColumn get id => text()();
+  TextColumn get tenantId => text()();
+  TextColumn get receiptNumber => text()();
+  DateTimeColumn get date => dateTime()();
+  RealColumn get baseAmount => real()();
+  BoolColumn get isGstBilling => boolean()();
+  TextColumn get companyGst => text().nullable()();
+  TextColumn get clientGst => text().nullable()();
+  RealColumn get sgst => real()();
+  RealColumn get cgst => real()();
+  RealColumn get igst => real()();
+  RealColumn get totalAmount => real()();
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
 @DriftDatabase(
   tables: [
     Companies,
@@ -173,6 +190,7 @@ class BackupReports extends Table {
     AuditLogs,
     RecoveryCodes,
     BackupReports,
+    LocalReceipts,
   ],
 )
 class LocalDatabase extends _$LocalDatabase {

@@ -128,6 +128,23 @@ class ManagedRequestDrafts extends Table {
   Set<Column<Object>> get primaryKey => {tenantId, id};
 }
 
+class LocalReceipts extends Table {
+  TextColumn get id => text()();
+  TextColumn get tenantId => text()();
+  TextColumn get receiptNumber => text()();
+  DateTimeColumn get date => dateTime()();
+  RealColumn get baseAmount => real()();
+  BoolColumn get isGstBilling => boolean()();
+  TextColumn get companyGst => text().nullable()();
+  TextColumn get clientGst => text().nullable()();
+  RealColumn get sgst => real()();
+  RealColumn get cgst => real()();
+  RealColumn get igst => real()();
+  RealColumn get totalAmount => real()();
+  @override
+  Set<Column<Object>> get primaryKey => {tenantId, id};
+}
+
 @DriftDatabase(
   tables: [
     CachedParts,
@@ -139,6 +156,7 @@ class ManagedRequestDrafts extends Table {
     OfflinePrintLogs,
     LocalLabelPreviews,
     ManagedRequestDrafts,
+    LocalReceipts,
   ],
 )
 class AndroidCacheDatabase extends _$AndroidCacheDatabase {

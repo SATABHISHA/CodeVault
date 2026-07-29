@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../authentication/presentation/session_controller.dart';
 import '../../labels/application/production_activity.dart';
 import '../../labels/data/local_part_repository.dart';
+import '../../labels/data/web_local_part_repository.dart';
 import '../../labels/data/part_repository.dart';
 import '../../sync/data/android_cache_database.dart';
 import '../../windows_desktop/application/windows_session.dart';
@@ -18,7 +19,8 @@ class DashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final activity = ref.watch(productionActivityProvider);
+    final activityAsync = ref.watch(productionActivityProvider);
+    final activity = activityAsync.value ?? const ProductionActivity();
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -167,13 +169,7 @@ class DashboardScreen extends ConsumerWidget {
               subtitle: 'Connect and test',
               onTap: () => context.go('/printers'),
             ),
-            _Action(
-              icon: Icons.sync,
-              color: const Color(0xFF00A86B),
-              title: 'Synchronize',
-              subtitle: 'Review pending data',
-              onTap: () => context.go('/sync'),
-            ),
+
             _Action(
               icon: Icons.support_agent,
               color: const Color(0xFFFF5C8A),
@@ -196,12 +192,12 @@ class _PartsMetric extends StatelessWidget {
     if (PlatformCapabilities.current().isWindows) {
       return LocalPartRepository(LocalDatabase(activeTenant));
     }
-    return CloudPartRepository();
+    return WebLocalPartRepository();
   }
 
   @override
   Widget build(BuildContext context) {
-    final activeTenant = tenantId ?? (PlatformCapabilities.current().isWindows ? WindowsSession.companyId : null);
+    final activeTenant = tenantId ?? (PlatformCapabilities.current().isWindows ? WindowsSession.companyId : 'platform-owner');
     return FutureBuilder<int>(
       future: activeTenant == null
           ? Future.value(0)
@@ -242,18 +238,18 @@ class _LocalCountMetric extends StatelessWidget {
   final String detail;
 
   Future<int> _count() async {
-    if (tenantId == null) return 0;
+    final effectiveTenant = tenantId ?? 'platform-owner';
     final database = kIsWeb
-        ? AndroidCacheDatabase.forWeb(tenantId!)
-        : AndroidCacheDatabase(tenantId!);
+        ? AndroidCacheDatabase.forWeb(effectiveTenant)
+        : AndroidCacheDatabase(effectiveTenant);
     try {
       return switch (source) {
         _LocalMetricSource.templates => (await (database.select(
           database.localLabelPreviews,
-        )..where((row) => row.tenantId.equals(tenantId!))).get()).length,
+        )..where((row) => row.tenantId.equals(effectiveTenant))).get()).length,
         _LocalMetricSource.printers => (await (database.select(
           database.androidPrinterProfiles,
-        )..where((row) => row.tenantId.equals(tenantId!))).get()).length,
+        )..where((row) => row.tenantId.equals(effectiveTenant))).get()).length,
       };
     } finally {
       await database.close();
@@ -306,17 +302,13 @@ class _ProductionChart extends StatelessWidget {
             height: 150,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (final entry in [
-                  ('Mon', 0.04),
-                  ('Tue', 0.04),
-                  ('Wed', 0.04),
-                  ('Thu', 0.04),
-                  ('Fri', 0.04),
-                  ('Sat', 0.04),
-                  ('Sun', total > 0 ? 1.0 : 0.04),
-                ])
-                  Expanded(
+              children: List.generate(7, (index) {
+                final date = DateTime.now().subtract(Duration(days: 6 - index));
+                final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                final label = weekdays[date.weekday - 1];
+                final isToday = index == 6;
+                final height = (isToday && total > 0) ? 1.0 : 0.04;
+                return Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 5),
                       child: Column(
@@ -326,7 +318,7 @@ class _ProductionChart extends StatelessWidget {
                             child: Align(
                               alignment: Alignment.bottomCenter,
                               child: FractionallySizedBox(
-                                heightFactor: entry.$2,
+                                heightFactor: height,
                                 child: Container(
                                   decoration: BoxDecoration(
                                     gradient: const LinearGradient(
@@ -345,14 +337,14 @@ class _ProductionChart extends StatelessWidget {
                           ),
                           const SizedBox(height: 7),
                           Text(
-                            entry.$1,
+                            label,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
-                      ),
                     ),
                   ),
-              ],
+                );
+              }),
             ),
           ),
         ],

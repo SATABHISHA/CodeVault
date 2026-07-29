@@ -18,7 +18,6 @@ class AppShell extends ConsumerWidget {
     (Icons.admin_panel_settings_outlined, 'Administration', '/administration'),
     (Icons.payments_outlined, 'Billing', '/billing'),
     (Icons.auto_awesome_mosaic_outlined, 'Label studio', '/studio'),
-    (Icons.sync_outlined, 'Sync', '/sync'),
     (Icons.backup_outlined, 'Backup', '/backup'),
     (Icons.support_agent_outlined, 'Support', '/support'),
     (Icons.person_outline, 'Profile', '/profile'),

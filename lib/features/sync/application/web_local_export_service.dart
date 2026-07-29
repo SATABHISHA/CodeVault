@@ -144,7 +144,7 @@ class WebLocalExportService {
         'Export belongs to another tenant or format.',
       );
     }
-    if (manifest['generation'] != serverGeneration) {
+    if ((manifest['generation'] as int) < serverGeneration) {
       throw StateError(
         'Browser export is stale; align with Laravel before import.',
       );
