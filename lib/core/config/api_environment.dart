@@ -20,13 +20,14 @@ abstract final class ApiEnvironment {
         'API_URL must be supplied with --dart-define for release builds.',
       );
     }
-    if (isWebPlatform) return 'http://127.0.0.1:8000/api/v1';
+    if (isWebPlatform) return 'https://codevault.sroy.es/api/v1';
     if (platform == TargetPlatform.android) {
       return _normalize(
-        _androidLanUrl.isEmpty ? 'http://10.0.2.2:8000/api/v1' : _androidLanUrl,
+        _androidLanUrl.isEmpty ? 'https://codevault.sroy.es/api/v1' : _androidLanUrl,
       );
     }
-    return 'http://127.0.0.1:8000/api/v1';
+    return 'https://codevault.sroy.es/api/v1'; 
+    // http://10.0.2.2:8000/api/v1'
   }
 
   static String _normalize(String value) =>

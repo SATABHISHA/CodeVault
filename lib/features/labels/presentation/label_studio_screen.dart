@@ -42,8 +42,13 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   bool loading = true;
   bool busy = false;
   bool includeName = true;
+  bool includeBorder = true;
   String symbology = 'data_matrix';
   String labelSize = '100 × 30 mm';
+  int stickersPerRow = 1; // will be set to maxStickersPerRow in initState
+  static const double maxPageWidthMm = 210.0;
+  int get maxStickersPerRow => (maxPageWidthMm / sizes[labelSize]!.$1).floor();
+  
   String port = '';
   String message = 'Ready for production';
   Timer? debounce;
@@ -84,6 +89,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _load();
       _loadPrinters();
+      // Initialise stickersPerRow to the calculated max for the default label/code
+      setState(() => stickersPerRow = maxStickersPerRow);
     });
   }
 
@@ -365,7 +372,20 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
           'Label profile',
           labelSize,
           sizes.keys.toList(),
-          (value) => setState(() => labelSize = value),
+          (value) {
+            setState(() {
+              labelSize = value;
+              // Always reset to the new max when profile changes
+              stickersPerRow = (maxPageWidthMm / sizes[value]!.$1).floor();
+            });
+          },
+        ),
+        const SizedBox(height: 12),
+        _dropdown(
+          'Stickers per row',
+          stickersPerRow.toString(),
+          List.generate(maxStickersPerRow, (i) => (i + 1).toString()),
+          (value) => setState(() => stickersPerRow = int.tryParse(value) ?? 1),
         ),
         const SizedBox(height: 12),
         _dropdown('Code type', symbology, const [
@@ -379,6 +399,13 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
           subtitle: const Text('Controls the printed label variant'),
           value: includeName,
           onChanged: (value) => setState(() => includeName = value),
+        ),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Include border'),
+          subtitle: const Text('Print a border around each sticker'),
+          value: includeBorder,
+          onChanged: (value) => setState(() => includeBorder = value),
         ),
       ],
     ),
@@ -794,6 +821,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       model: model.text,
       company: companyName.text.trim(),
       companyAddress: companyAddress.text.trim(),
+      packQty: int.tryParse(pack.text) ?? 1,
+      stickersPerRow: stickersPerRow,
+      includeBorder: includeBorder,
     );
   }
 
