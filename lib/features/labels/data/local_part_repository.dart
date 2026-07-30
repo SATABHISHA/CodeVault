@@ -80,8 +80,8 @@ class LocalPartRepository implements PartRepository {
         model: Value(data['item_model'] as String?),
         description: Value(data['part_number'] as String?),
         defaultDrCode: Value(data['default_dr_code'] as String?),
-        defaultPackQuantity: Value(data['default_pack_quantity'] as int?),
-        barcodeType: Value(data['barcode_type'] as String?),
+        defaultPackQuantity: Value(data['default_pack_quantity'] as int? ?? part.packQuantity),
+        barcodeType: Value(data['barcode_type'] as String? ?? part.barcodeType),
         updatedAt: Value(DateTime.now()),
       ),
     );
