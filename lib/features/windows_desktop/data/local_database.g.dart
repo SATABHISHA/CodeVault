@@ -1841,6 +1841,40 @@ class $PartsTable extends Parts with TableInfo<$PartsTable, Part> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _defaultDrCodeMeta = const VerificationMeta(
+    'defaultDrCode',
+  );
+  @override
+  late final GeneratedColumn<String> defaultDrCode = GeneratedColumn<String>(
+    'default_dr_code',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _defaultPackQuantityMeta =
+      const VerificationMeta('defaultPackQuantity');
+  @override
+  late final GeneratedColumn<int> defaultPackQuantity = GeneratedColumn<int>(
+    'default_pack_quantity',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(1),
+  );
+  static const VerificationMeta _barcodeTypeMeta = const VerificationMeta(
+    'barcodeType',
+  );
+  @override
+  late final GeneratedColumn<String> barcodeType = GeneratedColumn<String>(
+    'barcode_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('code128'),
+  );
   static const VerificationMeta _activeMeta = const VerificationMeta('active');
   @override
   late final GeneratedColumn<bool> active = GeneratedColumn<bool>(
@@ -1873,6 +1907,9 @@ class $PartsTable extends Parts with TableInfo<$PartsTable, Part> {
     item,
     model,
     description,
+    defaultDrCode,
+    defaultPackQuantity,
+    barcodeType,
     active,
     updatedAt,
   ];
@@ -1924,6 +1961,33 @@ class $PartsTable extends Parts with TableInfo<$PartsTable, Part> {
         ),
       );
     }
+    if (data.containsKey('default_dr_code')) {
+      context.handle(
+        _defaultDrCodeMeta,
+        defaultDrCode.isAcceptableOrUnknown(
+          data['default_dr_code']!,
+          _defaultDrCodeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('default_pack_quantity')) {
+      context.handle(
+        _defaultPackQuantityMeta,
+        defaultPackQuantity.isAcceptableOrUnknown(
+          data['default_pack_quantity']!,
+          _defaultPackQuantityMeta,
+        ),
+      );
+    }
+    if (data.containsKey('barcode_type')) {
+      context.handle(
+        _barcodeTypeMeta,
+        barcodeType.isAcceptableOrUnknown(
+          data['barcode_type']!,
+          _barcodeTypeMeta,
+        ),
+      );
+    }
     if (data.containsKey('active')) {
       context.handle(
         _activeMeta,
@@ -1965,6 +2029,18 @@ class $PartsTable extends Parts with TableInfo<$PartsTable, Part> {
         DriftSqlType.string,
         data['${effectivePrefix}description'],
       ),
+      defaultDrCode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_dr_code'],
+      ),
+      defaultPackQuantity: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}default_pack_quantity'],
+      )!,
+      barcodeType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}barcode_type'],
+      )!,
       active: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}active'],
@@ -1988,6 +2064,9 @@ class Part extends DataClass implements Insertable<Part> {
   final String item;
   final String? model;
   final String? description;
+  final String? defaultDrCode;
+  final int defaultPackQuantity;
+  final String barcodeType;
   final bool active;
   final DateTime updatedAt;
   const Part({
@@ -1996,6 +2075,9 @@ class Part extends DataClass implements Insertable<Part> {
     required this.item,
     this.model,
     this.description,
+    this.defaultDrCode,
+    required this.defaultPackQuantity,
+    required this.barcodeType,
     required this.active,
     required this.updatedAt,
   });
@@ -2011,6 +2093,11 @@ class Part extends DataClass implements Insertable<Part> {
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
+    if (!nullToAbsent || defaultDrCode != null) {
+      map['default_dr_code'] = Variable<String>(defaultDrCode);
+    }
+    map['default_pack_quantity'] = Variable<int>(defaultPackQuantity);
+    map['barcode_type'] = Variable<String>(barcodeType);
     map['active'] = Variable<bool>(active);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -2027,6 +2114,11 @@ class Part extends DataClass implements Insertable<Part> {
       description: description == null && nullToAbsent
           ? const Value.absent()
           : Value(description),
+      defaultDrCode: defaultDrCode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(defaultDrCode),
+      defaultPackQuantity: Value(defaultPackQuantity),
+      barcodeType: Value(barcodeType),
       active: Value(active),
       updatedAt: Value(updatedAt),
     );
@@ -2043,6 +2135,11 @@ class Part extends DataClass implements Insertable<Part> {
       item: serializer.fromJson<String>(json['item']),
       model: serializer.fromJson<String?>(json['model']),
       description: serializer.fromJson<String?>(json['description']),
+      defaultDrCode: serializer.fromJson<String?>(json['defaultDrCode']),
+      defaultPackQuantity: serializer.fromJson<int>(
+        json['defaultPackQuantity'],
+      ),
+      barcodeType: serializer.fromJson<String>(json['barcodeType']),
       active: serializer.fromJson<bool>(json['active']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -2056,6 +2153,9 @@ class Part extends DataClass implements Insertable<Part> {
       'item': serializer.toJson<String>(item),
       'model': serializer.toJson<String?>(model),
       'description': serializer.toJson<String?>(description),
+      'defaultDrCode': serializer.toJson<String?>(defaultDrCode),
+      'defaultPackQuantity': serializer.toJson<int>(defaultPackQuantity),
+      'barcodeType': serializer.toJson<String>(barcodeType),
       'active': serializer.toJson<bool>(active),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -2067,6 +2167,9 @@ class Part extends DataClass implements Insertable<Part> {
     String? item,
     Value<String?> model = const Value.absent(),
     Value<String?> description = const Value.absent(),
+    Value<String?> defaultDrCode = const Value.absent(),
+    int? defaultPackQuantity,
+    String? barcodeType,
     bool? active,
     DateTime? updatedAt,
   }) => Part(
@@ -2075,6 +2178,11 @@ class Part extends DataClass implements Insertable<Part> {
     item: item ?? this.item,
     model: model.present ? model.value : this.model,
     description: description.present ? description.value : this.description,
+    defaultDrCode: defaultDrCode.present
+        ? defaultDrCode.value
+        : this.defaultDrCode,
+    defaultPackQuantity: defaultPackQuantity ?? this.defaultPackQuantity,
+    barcodeType: barcodeType ?? this.barcodeType,
     active: active ?? this.active,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -2087,6 +2195,15 @@ class Part extends DataClass implements Insertable<Part> {
       description: data.description.present
           ? data.description.value
           : this.description,
+      defaultDrCode: data.defaultDrCode.present
+          ? data.defaultDrCode.value
+          : this.defaultDrCode,
+      defaultPackQuantity: data.defaultPackQuantity.present
+          ? data.defaultPackQuantity.value
+          : this.defaultPackQuantity,
+      barcodeType: data.barcodeType.present
+          ? data.barcodeType.value
+          : this.barcodeType,
       active: data.active.present ? data.active.value : this.active,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -2100,6 +2217,9 @@ class Part extends DataClass implements Insertable<Part> {
           ..write('item: $item, ')
           ..write('model: $model, ')
           ..write('description: $description, ')
+          ..write('defaultDrCode: $defaultDrCode, ')
+          ..write('defaultPackQuantity: $defaultPackQuantity, ')
+          ..write('barcodeType: $barcodeType, ')
           ..write('active: $active, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -2107,8 +2227,18 @@ class Part extends DataClass implements Insertable<Part> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, companyId, item, model, description, active, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    companyId,
+    item,
+    model,
+    description,
+    defaultDrCode,
+    defaultPackQuantity,
+    barcodeType,
+    active,
+    updatedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2118,6 +2248,9 @@ class Part extends DataClass implements Insertable<Part> {
           other.item == this.item &&
           other.model == this.model &&
           other.description == this.description &&
+          other.defaultDrCode == this.defaultDrCode &&
+          other.defaultPackQuantity == this.defaultPackQuantity &&
+          other.barcodeType == this.barcodeType &&
           other.active == this.active &&
           other.updatedAt == this.updatedAt);
 }
@@ -2128,6 +2261,9 @@ class PartsCompanion extends UpdateCompanion<Part> {
   final Value<String> item;
   final Value<String?> model;
   final Value<String?> description;
+  final Value<String?> defaultDrCode;
+  final Value<int> defaultPackQuantity;
+  final Value<String> barcodeType;
   final Value<bool> active;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -2137,6 +2273,9 @@ class PartsCompanion extends UpdateCompanion<Part> {
     this.item = const Value.absent(),
     this.model = const Value.absent(),
     this.description = const Value.absent(),
+    this.defaultDrCode = const Value.absent(),
+    this.defaultPackQuantity = const Value.absent(),
+    this.barcodeType = const Value.absent(),
     this.active = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2147,6 +2286,9 @@ class PartsCompanion extends UpdateCompanion<Part> {
     required String item,
     this.model = const Value.absent(),
     this.description = const Value.absent(),
+    this.defaultDrCode = const Value.absent(),
+    this.defaultPackQuantity = const Value.absent(),
+    this.barcodeType = const Value.absent(),
     this.active = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2159,6 +2301,9 @@ class PartsCompanion extends UpdateCompanion<Part> {
     Expression<String>? item,
     Expression<String>? model,
     Expression<String>? description,
+    Expression<String>? defaultDrCode,
+    Expression<int>? defaultPackQuantity,
+    Expression<String>? barcodeType,
     Expression<bool>? active,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -2169,6 +2314,10 @@ class PartsCompanion extends UpdateCompanion<Part> {
       if (item != null) 'item': item,
       if (model != null) 'model': model,
       if (description != null) 'description': description,
+      if (defaultDrCode != null) 'default_dr_code': defaultDrCode,
+      if (defaultPackQuantity != null)
+        'default_pack_quantity': defaultPackQuantity,
+      if (barcodeType != null) 'barcode_type': barcodeType,
       if (active != null) 'active': active,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -2181,6 +2330,9 @@ class PartsCompanion extends UpdateCompanion<Part> {
     Value<String>? item,
     Value<String?>? model,
     Value<String?>? description,
+    Value<String?>? defaultDrCode,
+    Value<int>? defaultPackQuantity,
+    Value<String>? barcodeType,
     Value<bool>? active,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -2191,6 +2343,9 @@ class PartsCompanion extends UpdateCompanion<Part> {
       item: item ?? this.item,
       model: model ?? this.model,
       description: description ?? this.description,
+      defaultDrCode: defaultDrCode ?? this.defaultDrCode,
+      defaultPackQuantity: defaultPackQuantity ?? this.defaultPackQuantity,
+      barcodeType: barcodeType ?? this.barcodeType,
       active: active ?? this.active,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -2215,6 +2370,15 @@ class PartsCompanion extends UpdateCompanion<Part> {
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
+    if (defaultDrCode.present) {
+      map['default_dr_code'] = Variable<String>(defaultDrCode.value);
+    }
+    if (defaultPackQuantity.present) {
+      map['default_pack_quantity'] = Variable<int>(defaultPackQuantity.value);
+    }
+    if (barcodeType.present) {
+      map['barcode_type'] = Variable<String>(barcodeType.value);
+    }
     if (active.present) {
       map['active'] = Variable<bool>(active.value);
     }
@@ -2235,6 +2399,9 @@ class PartsCompanion extends UpdateCompanion<Part> {
           ..write('item: $item, ')
           ..write('model: $model, ')
           ..write('description: $description, ')
+          ..write('defaultDrCode: $defaultDrCode, ')
+          ..write('defaultPackQuantity: $defaultPackQuantity, ')
+          ..write('barcodeType: $barcodeType, ')
           ..write('active: $active, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -8791,6 +8958,9 @@ typedef $$PartsTableCreateCompanionBuilder =
       required String item,
       Value<String?> model,
       Value<String?> description,
+      Value<String?> defaultDrCode,
+      Value<int> defaultPackQuantity,
+      Value<String> barcodeType,
       Value<bool> active,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -8802,6 +8972,9 @@ typedef $$PartsTableUpdateCompanionBuilder =
       Value<String> item,
       Value<String?> model,
       Value<String?> description,
+      Value<String?> defaultDrCode,
+      Value<int> defaultPackQuantity,
+      Value<String> barcodeType,
       Value<bool> active,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -8855,6 +9028,21 @@ class $$PartsTableFilterComposer
 
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get defaultDrCode => $composableBuilder(
+    column: $table.defaultDrCode,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get defaultPackQuantity => $composableBuilder(
+    column: $table.defaultPackQuantity,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get barcodeType => $composableBuilder(
+    column: $table.barcodeType,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8921,6 +9109,21 @@ class $$PartsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get defaultDrCode => $composableBuilder(
+    column: $table.defaultDrCode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get defaultPackQuantity => $composableBuilder(
+    column: $table.defaultPackQuantity,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get barcodeType => $composableBuilder(
+    column: $table.barcodeType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get active => $composableBuilder(
     column: $table.active,
     builder: (column) => ColumnOrderings(column),
@@ -8975,6 +9178,21 @@ class $$PartsTableAnnotationComposer
 
   GeneratedColumn<String> get description => $composableBuilder(
     column: $table.description,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get defaultDrCode => $composableBuilder(
+    column: $table.defaultDrCode,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get defaultPackQuantity => $composableBuilder(
+    column: $table.defaultPackQuantity,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get barcodeType => $composableBuilder(
+    column: $table.barcodeType,
     builder: (column) => column,
   );
 
@@ -9041,6 +9259,9 @@ class $$PartsTableTableManager
                 Value<String> item = const Value.absent(),
                 Value<String?> model = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<String?> defaultDrCode = const Value.absent(),
+                Value<int> defaultPackQuantity = const Value.absent(),
+                Value<String> barcodeType = const Value.absent(),
                 Value<bool> active = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -9050,6 +9271,9 @@ class $$PartsTableTableManager
                 item: item,
                 model: model,
                 description: description,
+                defaultDrCode: defaultDrCode,
+                defaultPackQuantity: defaultPackQuantity,
+                barcodeType: barcodeType,
                 active: active,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -9061,6 +9285,9 @@ class $$PartsTableTableManager
                 required String item,
                 Value<String?> model = const Value.absent(),
                 Value<String?> description = const Value.absent(),
+                Value<String?> defaultDrCode = const Value.absent(),
+                Value<int> defaultPackQuantity = const Value.absent(),
+                Value<String> barcodeType = const Value.absent(),
                 Value<bool> active = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -9070,6 +9297,9 @@ class $$PartsTableTableManager
                 item: item,
                 model: model,
                 description: description,
+                defaultDrCode: defaultDrCode,
+                defaultPackQuantity: defaultPackQuantity,
+                barcodeType: barcodeType,
                 active: active,
                 updatedAt: updatedAt,
                 rowid: rowid,
