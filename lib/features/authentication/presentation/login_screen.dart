@@ -224,11 +224,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     } catch (exception) {
       if (mounted) {
-        final message = exception is DioException && exception.response == null
-            ? 'We could not reach CodeVault. Check your connection and try again.'
-            : exception is DioException && exception.response?.statusCode == 429
-            ? 'Too many attempts. Please wait a moment before trying again.'
-            : 'The username or password is incorrect. Please check your details.';
+        String message;
+        if (exception is DioException) {
+          if (exception.response == null) {
+            message = 'We could not reach CodeVault. Check your connection and try again.';
+          } else if (exception.response?.statusCode == 429) {
+            message = 'Too many attempts. Please wait a moment before trying again.';
+          } else if (exception.response?.statusCode == 422) {
+            message = 'The username or password is incorrect. Please check your details.';
+          } else if (exception.response?.statusCode == 403) {
+            message = 'Your account or tenant is currently unavailable.';
+          } else {
+            message = 'An unexpected server error occurred (${exception.response?.statusCode}). Please try again later.';
+          }
+        } else {
+          message = 'An unexpected error occurred. Please try again.';
+        }
         await _showLoginFailure(message);
       }
     } finally {
