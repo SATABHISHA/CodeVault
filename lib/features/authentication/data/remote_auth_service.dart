@@ -94,6 +94,17 @@ class RemoteAuthService {
     );
   }
 
+  /// Windows-only: generates a reset token server-side and returns it
+  /// directly without sending an email.
+  Future<String?> revealPasswordToken(String email) async {
+    final response = await client.dio.post<Map<String, dynamic>>(
+      '/auth/forgot-password/reveal-token',
+      data: {'email': email.trim(), 'platform': 'windows'},
+    );
+    final data = response.data?['data'] as Map<String, dynamic>?;
+    return data?['token'] as String?;
+  }
+
   Future<void> resetPassword({
     required String email,
     required String token,
