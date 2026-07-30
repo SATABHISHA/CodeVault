@@ -20,7 +20,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Web
-        run: flutter build web --release --base-href / --dart-define=API_URL=https://codevault.sroy.es/api/v1
+        run: flutter build web --release --base-href /
 
       - name: Push to web-production branch
         uses: peaceiris/actions-gh-pages@v3

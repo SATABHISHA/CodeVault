@@ -27,7 +27,7 @@ class RemoteSession {
 class RemoteAuthService {
   RemoteAuthService({ApiClient? client, TokenStore? tokenStore})
     : client = client ?? ApiClient(),
-      tokenStore = tokenStore ?? const SecureTokenStore();
+      tokenStore = tokenStore ?? TokenStore.create();
   final ApiClient client;
   final TokenStore tokenStore;
 

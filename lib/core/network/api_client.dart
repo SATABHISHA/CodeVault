@@ -4,7 +4,7 @@ import '../security/token_store.dart';
 
 class ApiClient {
   ApiClient({Dio? dio, TokenStore? tokenStore, this.onSessionExpired})
-    : _tokenStore = tokenStore ?? const SecureTokenStore(),
+    : _tokenStore = tokenStore ?? TokenStore.create(),
       dio =
           dio ??
           Dio(
