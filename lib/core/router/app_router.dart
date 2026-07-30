@@ -18,10 +18,33 @@ import 'package:codevault/features/windows_desktop/presentation/user_management_
 import 'package:codevault/features/windows_desktop/presentation/windows_dashboard_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:codevault/core/platform/platform_capabilities.dart';
+import 'package:codevault/features/authentication/presentation/session_controller.dart';
 
 final appRouterProvider = Provider<GoRouter>(
   (ref) => GoRouter(
     initialLocation: '/splash',
+    redirect: (context, state) {
+      final session = ref.read(sessionProvider);
+      final isAuth = session.authenticated;
+
+      final isAuthRoute = state.uri.path == '/login' ||
+          state.uri.path == '/forgot-password' ||
+          state.uri.path == '/splash';
+
+      if (!isAuth && !isAuthRoute) {
+        return '/login';
+      }
+
+      if (isAuth && isAuthRoute && state.uri.path != '/splash') {
+        if (PlatformCapabilities.current().isWindows) {
+          return '/windows';
+        }
+        return '/dashboard';
+      }
+
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/splash',

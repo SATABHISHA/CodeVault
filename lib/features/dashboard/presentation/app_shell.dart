@@ -75,7 +75,7 @@ class AppShell extends ConsumerWidget {
       return Scaffold(
         appBar: AppBar(
           title: const Text(BrandConfig.productName),
-          actions: [_skinMenu(context, ref), _accountMenu(context, ref)],
+          actions: [_skinMenu(context, ref), _logoutButton(context, ref)],
         ),
         body: content,
         bottomNavigationBar: NavigationBar(
@@ -133,7 +133,7 @@ class AppShell extends ConsumerWidget {
                   automaticallyImplyLeading: false,
                   actions: [
                     _skinMenu(context, ref),
-                    _accountMenu(context, ref),
+                    _logoutButton(context, ref),
                     const SizedBox(width: 10),
                   ],
                 ),
@@ -156,58 +156,78 @@ class AppShell extends ConsumerWidget {
           for (final skin in AppSkin.values)
             PopupMenuItem(
               value: skin,
-              child: ListTile(
-                leading: Icon(Icons.circle, color: skin.color),
-                title: Text(skin.label),
+              child: IgnorePointer(
+                child: ListTile(
+                  leading: Icon(Icons.circle, color: skin.color),
+                  title: Text(skin.label),
+                ),
               ),
             ),
         ],
       );
 
-  Widget _accountMenu(BuildContext context, WidgetRef ref) =>
-      PopupMenuButton<String>(
-        tooltip: 'Account menu',
-        icon: const CircleAvatar(child: Icon(Icons.person_outline)),
-        onSelected: (value) async {
-          if (value == 'profile') {
-            context.go('/profile');
-            return;
-          }
-          try {
-            if (PlatformCapabilities.current().isWindows) {
-              WindowsSession.clear();
-              if (context.mounted) context.go('/windows');
-              return;
-            }
-            await RemoteAuthService().logout();
-          } catch (_) {
-            /* token is cleared locally */
-          }
-          ref.read(sessionProvider.notifier).signOut();
-          if (context.mounted) context.go('/login');
-        },
-        itemBuilder: (context) => [
-          const PopupMenuItem(
-            value: 'profile',
-            child: Row(
-              children: [
-                Icon(Icons.settings_outlined),
-                SizedBox(width: 12),
-                Text('Profile & appearance'),
-              ],
-            ),
-          ),
-          const PopupMenuDivider(),
-          const PopupMenuItem(
-            value: 'logout',
-            child: Row(
-              children: [
-                Icon(Icons.logout),
-                SizedBox(width: 12),
-                Text('Logout'),
-              ],
-            ),
-          ),
-        ],
+  Widget _logoutButton(BuildContext context, WidgetRef ref) => IconButton(
+        tooltip: 'Logout',
+        icon: const CircleAvatar(
+          backgroundColor: Colors.transparent,
+          child: Icon(Icons.logout),
+        ),
+        onPressed: () => _showLogoutDialog(context, ref),
       );
+
+  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Dismiss',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) => const SizedBox(),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return ScaleTransition(
+          scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+          child: FadeTransition(
+            opacity: animation,
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              title: const Row(
+                children: [
+                  Icon(Icons.logout, color: Colors.redAccent),
+                  SizedBox(width: 12),
+                  Text('Logout'),
+                ],
+              ),
+              content: const Text('Are you sure you want to securely log out?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                  ),
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    try {
+                      if (PlatformCapabilities.current().isWindows) {
+                        WindowsSession.clear();
+                        if (context.mounted) context.go('/windows');
+                        return;
+                      }
+                      await RemoteAuthService().logout();
+                    } catch (_) {}
+                    ref.read(sessionProvider.notifier).signOut();
+                    if (context.mounted) context.go('/login');
+                  },
+                  child: const Text('Logout'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
