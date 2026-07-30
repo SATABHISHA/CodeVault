@@ -202,3 +202,6 @@ class AppShell extends ConsumerWidget {
         ],
       );
 }
+        ],
+      );
+}
