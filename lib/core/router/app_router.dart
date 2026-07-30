@@ -25,21 +25,29 @@ final appRouterProvider = Provider<GoRouter>(
   (ref) => GoRouter(
     initialLocation: '/splash',
     redirect: (context, state) {
+      final isWindows = PlatformCapabilities.current().isWindows;
+      final path = state.uri.path;
+
+      if (isWindows) {
+        if (path == '/splash') return null;
+        if (!path.startsWith('/windows')) {
+          return '/windows';
+        }
+        return null;
+      }
+
       final session = ref.read(sessionProvider);
       final isAuth = session.authenticated;
 
-      final isAuthRoute = state.uri.path == '/login' ||
-          state.uri.path == '/forgot-password' ||
-          state.uri.path == '/splash';
+      final isAuthRoute = path == '/login' ||
+          path == '/forgot-password' ||
+          path == '/splash';
 
       if (!isAuth && !isAuthRoute) {
         return '/login';
       }
 
-      if (isAuth && isAuthRoute && state.uri.path != '/splash') {
-        if (PlatformCapabilities.current().isWindows) {
-          return '/windows';
-        }
+      if (isAuth && isAuthRoute && path != '/splash') {
         return '/dashboard';
       }
 
