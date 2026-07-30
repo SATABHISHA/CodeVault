@@ -61,6 +61,9 @@ class Parts extends Table {
   TextColumn get item => text()();
   TextColumn get model => text().nullable()();
   TextColumn get description => text().nullable()();
+  TextColumn get defaultDrCode => text().nullable()();
+  IntColumn get defaultPackQuantity => integer().withDefault(const Constant(1))();
+  TextColumn get barcodeType => text().withDefault(const Constant('code128'))();
   BoolColumn get active => boolean().withDefault(const Constant(true))();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
   @override

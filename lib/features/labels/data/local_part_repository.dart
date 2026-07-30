@@ -17,9 +17,9 @@ class LocalPartRepository implements PartRepository {
     number: row.description ?? row.id, // description stores the part number
     name: row.item,
     model: row.model ?? '',
-    drCode: '',
-    packQuantity: 1,
-    barcodeType: 'code128',
+    drCode: row.defaultDrCode ?? '',
+    packQuantity: row.defaultPackQuantity,
+    barcodeType: row.barcodeType,
     version: 1,
   );
 
@@ -56,6 +56,9 @@ class LocalPartRepository implements PartRepository {
         item: data['item_name'] as String? ?? '',
         model: Value(data['item_model'] as String?),
         description: Value(data['part_number'] as String?),
+        defaultDrCode: Value(data['default_dr_code'] as String?),
+        defaultPackQuantity: Value(data['default_pack_quantity'] as int? ?? 1),
+        barcodeType: Value(data['barcode_type'] as String? ?? 'code128'),
         active: const Value(true),
       ),
     );
@@ -76,6 +79,9 @@ class LocalPartRepository implements PartRepository {
         item: Value(data['item_name'] as String? ?? part.name),
         model: Value(data['item_model'] as String?),
         description: Value(data['part_number'] as String?),
+        defaultDrCode: Value(data['default_dr_code'] as String?),
+        defaultPackQuantity: Value(data['default_pack_quantity'] as int?),
+        barcodeType: Value(data['barcode_type'] as String?),
         updatedAt: Value(DateTime.now()),
       ),
     );

@@ -24,9 +24,9 @@ class WebLocalPartRepository implements PartRepository {
       number: payload['part_number'] as String? ?? row.id,
       name: payload['item_name'] as String? ?? '',
       model: payload['item_model'] as String? ?? '',
-      drCode: '',
-      packQuantity: 1,
-      barcodeType: 'code128',
+      drCode: payload['default_dr_code'] as String? ?? '',
+      packQuantity: payload['default_pack_quantity'] as int? ?? 1,
+      barcodeType: payload['barcode_type'] as String? ?? 'code128',
       version: row.serverVersion,
     );
   }
@@ -67,6 +67,9 @@ class WebLocalPartRepository implements PartRepository {
       'part_number': data['part_number'],
       'item_name': data['item_name'],
       'item_model': data['item_model'],
+      'default_dr_code': data['default_dr_code'],
+      'default_pack_quantity': data['default_pack_quantity'],
+      'barcode_type': data['barcode_type'],
     };
     
     final db = _db(tenantId);
@@ -102,6 +105,9 @@ class WebLocalPartRepository implements PartRepository {
     if (data.containsKey('part_number')) payload['part_number'] = data['part_number'];
     if (data.containsKey('item_name')) payload['item_name'] = data['item_name'];
     if (data.containsKey('item_model')) payload['item_model'] = data['item_model'];
+    if (data.containsKey('default_dr_code')) payload['default_dr_code'] = data['default_dr_code'];
+    if (data.containsKey('default_pack_quantity')) payload['default_pack_quantity'] = data['default_pack_quantity'];
+    if (data.containsKey('barcode_type')) payload['barcode_type'] = data['barcode_type'];
 
     await (db.update(db.cachedParts)
           ..where((t) => t.tenantId.equals(tenantId) & t.id.equals(part.id)))
