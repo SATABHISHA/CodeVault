@@ -65,8 +65,13 @@ final appRouterProvider = Provider<GoRouter>(
       ),
       GoRoute(
         path: '/windows/recovery',
-        builder: (context, state) =>
-            OfflineRecoveryScreen(companyId: state.extra! as String),
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return OfflineRecoveryScreen(
+            companyId: extra['companyId'] as String? ?? '',
+            prefillUsername: extra['username'] as String? ?? '',
+          );
+        },
       ),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),

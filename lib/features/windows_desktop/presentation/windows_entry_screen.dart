@@ -451,7 +451,10 @@ class _LocalLoginScreenState extends State<LocalLoginScreen> {
                                 child: TextButton(
                                   onPressed: () => context.push(
                                     '/windows/recovery',
-                                    extra: widget.companyId,
+                                    extra: {
+                                      'companyId': widget.companyId,
+                                      'username': username.text.trim(),
+                                    },
                                   ),
                                   child: const Text('Forgot password?'),
                                 ),
