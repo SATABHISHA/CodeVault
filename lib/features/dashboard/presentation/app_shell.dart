@@ -186,22 +186,28 @@ class AppShell extends ConsumerWidget {
           ref.read(sessionProvider.notifier).signOut();
           if (context.mounted) context.go('/login');
         },
-        itemBuilder: (context) => const [
-          PopupMenuItem(
+        itemBuilder: (context) => [
+          const PopupMenuItem(
             value: 'profile',
-            child: ListTile(
-              leading: Icon(Icons.settings_outlined),
-              title: Text('Profile & appearance'),
+            child: Row(
+              children: [
+                Icon(Icons.settings_outlined),
+                SizedBox(width: 12),
+                Text('Profile & appearance'),
+              ],
             ),
           ),
-          PopupMenuDivider(),
-          PopupMenuItem(
+          const PopupMenuDivider(),
+          const PopupMenuItem(
             value: 'logout',
-            child: ListTile(leading: Icon(Icons.logout), title: Text('Logout')),
+            child: Row(
+              children: [
+                Icon(Icons.logout),
+                SizedBox(width: 12),
+                Text('Logout'),
+              ],
+            ),
           ),
-        ],
-      );
-}
         ],
       );
 }

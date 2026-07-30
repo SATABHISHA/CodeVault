@@ -1,0 +1,35 @@
+name: Deploy Flutter Web to Hostinger
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          
+      - name: Get Dependencies
+        run: flutter pub get
+
+      - name: Build Web
+        run: flutter build web --release --base-href /
+
+      - name: Deploy to Hostinger via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: 82.25.106.143
+          port: 65002
+          username: u473577775
+          password: ${{ secrets.HOSTINGER_PASSWORD }}
+          source: "build/web/*"
+          target: "domains/scanhub.sroy.es/public_html"
+          strip_components: 2
