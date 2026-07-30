@@ -22,13 +22,10 @@ jobs:
       - name: Build Web
         run: flutter build web --release --base-href / --dart-define=API_URL=https://codevault.sroy.es/api/v1
 
-      - name: Deploy to Hostinger via SCP
-        uses: appleboy/scp-action@v0.1.7
+      - name: Push to web-production branch
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          host: 82.25.106.143
-          port: 65002
-          username: u473577775
-          password: ${{ secrets.HOSTINGER_PASSWORD }}
-          source: "build/web/*"
-          target: "domains/scanhub.sroy.es/public_html"
-          strip_components: 2
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build/web
+          publish_branch: web-production
+          commit_message: "Deploy web production build"

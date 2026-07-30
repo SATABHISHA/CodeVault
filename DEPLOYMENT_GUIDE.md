@@ -20,8 +20,15 @@ The entire process is automated via **GitHub Actions**.
 3. **Wait 2 Minutes:**
    - As soon as you push to `main`, GitHub Actions detects the change.
    - GitHub will spin up a cloud server, install Flutter `3.38.7`, and automatically run `flutter build web --release`.
-   - Once the build is finished, GitHub will securely log into your Hostinger server (using the `HOSTINGER_PASSWORD` secret you provided) and copy the new compiled files directly into the `public_html` folder.
-4. **Done!** Visit `https://scanhub.sroy.es` in your browser and your changes will be live.
+   - Once the build is finished, GitHub will push the compiled files to the `web-production` branch automatically.
+4. **Deploy via SSH:**
+   - SSH into your Hostinger server: `ssh -p 65002 u473577775@82.25.106.143`
+   - Run the following commands:
+     ```bash
+     cd ~/domains/scanhub.sroy.es/public_html
+     git pull origin web-production
+     ```
+5. **Done!** Visit `https://scanhub.sroy.es` in your browser and your changes will be live.
 
 ---
 
@@ -35,5 +42,5 @@ The entire process is automated via **GitHub Actions**.
 ### Manual Backup Method (Not Recommended)
 If GitHub Actions is completely broken and you need to deploy immediately in an emergency, you can deploy manually:
 1. Run `flutter build web --release --base-href /` locally.
-2. Log into your Hostinger control panel or use an FTP client (like FileZilla).
-3. Upload all the contents of the `build/web/` directory directly into your Hostinger `domains/scanhub.sroy.es/public_html` folder, overwriting the old files.
+2. Log into your Hostinger server via SSH.
+3. Use `scp` or an FTP client to upload all the contents of the `build/web/` directory directly into your Hostinger `domains/scanhub.sroy.es/public_html` folder, overwriting the old files.
