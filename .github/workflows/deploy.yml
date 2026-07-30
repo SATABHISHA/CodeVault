@@ -20,7 +20,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Web
-        run: flutter build web --release --base-href /
+        run: flutter build web --release --base-href / --dart-define=API_URL=https://codevault.sroy.es/api/v1
 
       - name: Deploy to Hostinger via SCP
         uses: appleboy/scp-action@v0.1.7
