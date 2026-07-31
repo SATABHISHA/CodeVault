@@ -1,6 +1,10 @@
 import 'package:codevault/app.dart';
+import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:codevault/features/authentication/data/remote_auth_service.dart';
 import 'package:codevault/features/authentication/presentation/session_controller.dart';
+import 'package:codevault/features/windows_desktop/application/local_account_service.dart';
+import 'package:codevault/features/windows_desktop/application/windows_session.dart';
+import 'package:codevault/features/windows_desktop/data/local_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -56,9 +60,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       ),
                     ),
                     Text(
-                      session.tenantId == null
-                          ? 'Platform administration account'
-                          : 'Tenant production account',
+                      PlatformCapabilities.current().isWindows
+                          ? 'Local Windows account · ${WindowsSession.role ?? 'user'}'
+                          : session.tenantId == null
+                              ? 'Platform administration account'
+                              : 'Tenant production account',
                       style: const TextStyle(color: Colors.white70),
                     ),
                   ],
@@ -243,10 +249,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
     setState(() => busy = true);
     try {
-      await RemoteAuthService().changePassword(
-        currentPassword: current.text,
-        newPassword: password.text,
-      );
+      if (PlatformCapabilities.current().isWindows) {
+        final companyId = WindowsSession.companyId;
+        final userId = WindowsSession.userId;
+        if (companyId == null || userId == null) {
+          _show('No local session found. Please sign in again.');
+          return;
+        }
+        final db = LocalDatabase(companyId);
+        try {
+          await LocalAccountService(db).changePassword(
+            userId,
+            current.text,
+            password.text,
+          );
+        } finally {
+          await db.close();
+        }
+      } else {
+        await RemoteAuthService().changePassword(
+          currentPassword: current.text,
+          newPassword: password.text,
+        );
+      }
       current.clear();
       password.clear();
       confirmation.clear();
@@ -259,6 +284,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Future<void> _logout() async {
+    if (PlatformCapabilities.current().isWindows) {
+      WindowsSession.clear();
+      if (mounted) context.go('/windows');
+      return;
+    }
     try {
       await RemoteAuthService().logout();
     } catch (_) {

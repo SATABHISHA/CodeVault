@@ -30,13 +30,19 @@ class OfflineRecoveryService {
     if (!confirmed) {
       throw StateError('Explicit recovery confirmation is required.');
     }
-    final user =
-        await (database.select(database.localUsers)..where(
-              (row) =>
-                  row.username.equals(adminUsername.trim().toLowerCase()) &
-                  row.role.equals('admin'),
-            ))
-            .getSingleOrNull();
+    final normalized = adminUsername.trim().toLowerCase();
+    final company = await (database.select(database.companies)..limit(1)).getSingleOrNull();
+    final isCompanyEmail = company != null && company.email?.trim().toLowerCase() == normalized;
+
+    final user = await (database.select(database.localUsers)
+      ..where((row) {
+        if (isCompanyEmail) {
+          return row.username.equals(normalized) | row.role.equals('admin');
+        }
+        return row.username.equals(normalized) & row.role.equals('admin');
+      })
+      ..limit(1))
+      .getSingleOrNull();
     if (user == null || !user.active) {
       throw StateError('Eligible local administrator not found.');
     }

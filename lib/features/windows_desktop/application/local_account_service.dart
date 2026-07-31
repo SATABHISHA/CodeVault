@@ -71,9 +71,19 @@ class LocalAccountService {
 
   Future<LocalLoginResult> login(String username, String password) async {
     final normalized = username.trim().toLowerCase();
-    final user = await (database.select(
-      database.localUsers,
-    )..where((row) => row.username.equals(normalized))).getSingleOrNull();
+    
+    final company = await (database.select(database.companies)..limit(1)).getSingleOrNull();
+    final isCompanyEmail = company != null && company.email?.trim().toLowerCase() == normalized;
+
+    final user = await (database.select(database.localUsers)
+      ..where((row) {
+        if (isCompanyEmail) {
+          return row.username.equals(normalized) | row.role.equals('admin');
+        }
+        return row.username.equals(normalized);
+      })
+      ..limit(1))
+      .getSingleOrNull();
     if (user == null || !user.active) {
       throw StateError('Invalid local credentials.');
     }

@@ -30,7 +30,9 @@ final appRouterProvider = Provider<GoRouter>(
 
       if (isWindows) {
         if (path == '/splash') return null;
-        if (!path.startsWith('/windows')) {
+        // Allow shared routes that are valid for Windows (inside the ShellRoute)
+        const windowsAllowedShared = ['/backup', '/profile', '/about'];
+        if (!path.startsWith('/windows') && !windowsAllowedShared.contains(path)) {
           return '/windows';
         }
         return null;

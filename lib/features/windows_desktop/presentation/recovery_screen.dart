@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../shared/widgets/animated_login_background.dart';
 import '../../../shared/widgets/app_text_field.dart';
@@ -320,7 +321,13 @@ class _OfflineRecoveryScreenState extends State<OfflineRecoveryScreen> {
 
                         const SizedBox(height: 16),
                         TextButton.icon(
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () {
+                            if (context.canPop()) {
+                              context.pop();
+                            } else {
+                              context.go('/windows');
+                            }
+                          },
                           icon: const Icon(Icons.arrow_back, size: 18),
                           label: const Text('Back to sign in'),
                         ),
@@ -386,7 +393,11 @@ class _OfflineRecoveryScreenState extends State<OfflineRecoveryScreen> {
             content: Text('Password changed. You can now sign in.'),
           ),
         );
-        Navigator.pop(context);
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/windows');
+        }
       }
     } catch (exception) {
       if (mounted) setState(() => error = exception.toString());

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/config/brand_config.dart';
+import '../../../core/security/token_store.dart';
 import '../../../platform/windows/data/bootstrap_store.dart';
 import '../../../shared/widgets/animated_login_background.dart';
 import '../../../shared/widgets/app_text_field.dart';
@@ -326,6 +327,27 @@ class _LocalLoginScreenState extends State<LocalLoginScreen> {
   final password = TextEditingController();
   String? error;
   bool busy = false;
+  bool rememberMe = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedUsername();
+  }
+
+  Future<void> _loadRememberedUsername() async {
+    final saved = await const SecureTokenStore()
+        .readKey('local_login_username_${widget.companyId}');
+    if (saved != null && saved.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          username.text = saved;
+          rememberMe = true;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     body: Stack(
@@ -446,18 +468,31 @@ class _LocalLoginScreenState extends State<LocalLoginScreen> {
                                     ),
                                   ),
                                 ),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  onPressed: () => context.push(
-                                    '/windows/recovery',
-                                    extra: {
-                                      'companyId': widget.companyId,
-                                      'username': username.text.trim(),
-                                    },
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Checkbox(
+                                        value: rememberMe,
+                                        onChanged: (val) => setState(
+                                            () => rememberMe = val ?? false),
+                                      ),
+                                      const Text('Remember me'),
+                                    ],
                                   ),
-                                  child: const Text('Forgot password?'),
-                                ),
+                                  TextButton(
+                                    onPressed: () => context.push(
+                                      '/windows/recovery',
+                                      extra: {
+                                        'companyId': widget.companyId,
+                                        'username': username.text.trim(),
+                                      },
+                                    ),
+                                    child: const Text('Forgot password?'),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 15),
                               FilledButton.icon(
@@ -524,6 +559,15 @@ class _LocalLoginScreenState extends State<LocalLoginScreen> {
       )..where((row) => row.id.equals(widget.companyId))).getSingle();
       WindowsSession.companyName = company.name;
       WindowsSession.companyAddress = company.address ?? '';
+      
+      if (rememberMe) {
+        await const SecureTokenStore().writeKey(
+            'local_login_username_${widget.companyId}', username.text.trim());
+      } else {
+        await const SecureTokenStore().writeKey(
+            'local_login_username_${widget.companyId}', '');
+      }
+
       if (mounted) context.go('/windows/dashboard');
     } catch (exception) {
       if (mounted) setState(() => error = exception.toString());

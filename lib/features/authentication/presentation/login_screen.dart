@@ -1,5 +1,6 @@
 import 'package:codevault/core/config/brand_config.dart';
 import 'package:codevault/core/platform/platform_capabilities.dart';
+import 'package:codevault/core/security/token_store.dart';
 import 'package:codevault/features/authentication/data/remote_auth_service.dart';
 import 'package:codevault/features/authentication/presentation/session_controller.dart';
 import 'package:codevault/shared/widgets/animated_login_background.dart';
@@ -20,6 +21,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final login = TextEditingController();
   final password = TextEditingController();
   bool busy = false;
+  bool rememberMe = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRememberedUsername();
+  }
+
+  Future<void> _loadRememberedUsername() async {
+    final saved = await const SecureTokenStore().readKey('cloud_login_username');
+    if (saved != null && saved.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          login.text = saved;
+          rememberMe = true;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -131,13 +151,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 obscureText: true,
                                 autofillHints: const [AutofillHints.password],
                               ),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  onPressed: () =>
-                                      context.go('/forgot-password'),
-                                  child: const Text('Forgot password?'),
-                                ),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Checkbox(
+                                        value: rememberMe,
+                                        onChanged: (val) => setState(
+                                            () => rememberMe = val ?? false),
+                                      ),
+                                      const Text('Remember me'),
+                                    ],
+                                  ),
+                                  TextButton(
+                                    onPressed: () =>
+                                        context.go('/forgot-password'),
+                                    child: const Text('Forgot password?'),
+                                  ),
+                                ],
                               ),
                               const SizedBox(height: 15),
                               FilledButton.icon(
@@ -219,6 +252,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             companyName: session.companyName,
             companyAddress: session.companyAddress,
           );
+          
+      if (rememberMe) {
+        await const SecureTokenStore().writeKey('cloud_login_username', login.text.trim());
+      } else {
+        await const SecureTokenStore().writeKey('cloud_login_username', '');
+      }
+
       if (mounted) {
         context.go('/dashboard');
       }
