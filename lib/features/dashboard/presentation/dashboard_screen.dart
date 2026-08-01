@@ -8,6 +8,7 @@ import '../../labels/application/production_activity.dart';
 import '../../labels/data/local_part_repository.dart';
 import '../../labels/data/part_repository.dart';
 import '../../labels/data/web_local_part_repository.dart';
+import '../../labels/data/custom_label_profile_store.dart';
 import '../../sync/data/android_cache_database.dart';
 import '../../windows_desktop/application/windows_session.dart';
 import '../../windows_desktop/data/local_database.dart' show LocalDatabase;
@@ -251,9 +252,15 @@ class _LocalCountMetric extends StatelessWidget {
         : AndroidCacheDatabase(effectiveTenant);
     try {
       return switch (source) {
-        _LocalMetricSource.templates => (await (database.select(
-          database.localLabelPreviews,
-        )..where((row) => row.tenantId.equals(effectiveTenant))).get()).length,
+        _LocalMetricSource.templates =>
+          (await (database.select(
+                database.localLabelPreviews,
+              )..where((row) => row.tenantId.equals(effectiveTenant))).get())
+              .where(
+                (row) =>
+                    !row.id.startsWith(CustomLabelProfileStore.recordPrefix),
+              )
+              .length,
         _LocalMetricSource.printers => (await (database.select(
           database.androidPrinterProfiles,
         )..where((row) => row.tenantId.equals(effectiveTenant))).get()).length,

@@ -34,11 +34,7 @@ class PortableAlignmentSafetyExporter implements AlignmentSafetyExporter {
   ) async {
     final filename = 'codevault-$tenantId-generation-$localGeneration.cvbackup';
     return save(
-      await service.export(
-        tenantId,
-        localGeneration,
-        ownerUserId: ownerUserId,
-      ),
+      await service.export(tenantId, localGeneration, ownerUserId: ownerUserId),
       filename,
     );
   }
@@ -181,17 +177,21 @@ class WebLocalExportService {
     final decoded = jsonDecode(utf8.decode(payload)) as Map<String, dynamic>;
     final parts = decoded['cached_parts'] as List;
     final drafts = decoded['pending_mutations'] as List;
+    final previews = (decoded['local_previews'] as List?) ?? const [];
     await database.transaction(() async {
       if (replace) {
-        await (database.delete(database.cachedParts)
-              ..where((row) => row.tenantId.equals(tenantId)))
-            .go();
-        await (database.delete(database.syncOutbox)
-              ..where((row) => row.tenantId.equals(tenantId)))
-            .go();
-        await (database.delete(database.syncConflicts)
-              ..where((row) => row.tenantId.equals(tenantId)))
-            .go();
+        await (database.delete(
+          database.cachedParts,
+        )..where((row) => row.tenantId.equals(tenantId))).go();
+        await (database.delete(
+          database.syncOutbox,
+        )..where((row) => row.tenantId.equals(tenantId))).go();
+        await (database.delete(
+          database.syncConflicts,
+        )..where((row) => row.tenantId.equals(tenantId))).go();
+        await (database.delete(
+          database.localLabelPreviews,
+        )..where((row) => row.tenantId.equals(tenantId))).go();
       }
       for (final raw in parts.cast<Map<String, dynamic>>()) {
         final existing =
@@ -212,6 +212,27 @@ class WebLocalExportService {
                   serverVersion: (raw['version'] as num).toInt(),
                   deleted: Value(raw['deleted'] as bool),
                   updatedAt: DateTime.parse(raw['updated_at'] as String),
+                ),
+              );
+        }
+      }
+      for (final raw in previews.cast<Map<String, dynamic>>()) {
+        final existing =
+            await (database.select(database.localLabelPreviews)..where(
+                  (row) =>
+                      row.tenantId.equals(tenantId) &
+                      row.id.equals(raw['id'] as String),
+                ))
+                .getSingleOrNull();
+        if (existing == null) {
+          await database
+              .into(database.localLabelPreviews)
+              .insert(
+                LocalLabelPreviewsCompanion.insert(
+                  id: raw['id'] as String,
+                  tenantId: tenantId,
+                  definitionJson: jsonEncode(raw['definition']),
+                  updatedAt: Value(DateTime.parse(raw['updated_at'] as String)),
                 ),
               );
         }

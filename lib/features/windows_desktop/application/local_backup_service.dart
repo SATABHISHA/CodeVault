@@ -24,15 +24,19 @@ class BackupManifest {
   final DateTime createdAt;
   final String databaseSha256;
   final String? ownerUserId;
-  Map<String, Object> toJson() => {
-    'format': 'codevault-backup',
-    'format_version': 1,
-    'company_id': companyId,
-    if (ownerUserId != null) 'owner_user_id': ownerUserId!,
-    'schema_version': schemaVersion,
-    'created_at': createdAt.toUtc().toIso8601String(),
-    'database_sha256': databaseSha256,
-  };
+  Map<String, Object> toJson() {
+    final result = <String, Object>{
+      'format': 'codevault-backup',
+      'format_version': 1,
+      'company_id': companyId,
+      'schema_version': schemaVersion,
+      'created_at': createdAt.toUtc().toIso8601String(),
+      'database_sha256': databaseSha256,
+    };
+    final owner = ownerUserId;
+    if (owner != null) result['owner_user_id'] = owner;
+    return result;
+  }
 }
 
 class LocalBackupService {
@@ -131,6 +135,7 @@ class LocalBackupService {
       'printers',
       'label_templates',
       'serial_rules',
+      'local_settings',
     ];
     final report = <String, int>{};
     try {

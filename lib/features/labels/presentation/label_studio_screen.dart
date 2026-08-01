@@ -14,9 +14,11 @@ import '../../../features/printers/data/printing_browser_gateway.dart';
 import '../../../features/printers/domain/browser_printing.dart';
 import '../../../shared/widgets/barcode_view.dart';
 import '../../backup/application/backup_import_revision.dart';
+import '../../authentication/presentation/session_controller.dart';
 import '../application/production_activity.dart';
 import '../data/local_part_repository.dart';
 import '../data/part_repository.dart';
+import '../data/custom_label_profile_store.dart';
 import '../data/web_local_part_repository.dart';
 import '../domain/label_typography.dart';
 
@@ -80,12 +82,14 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   Printer? _selectedPrinter;
   bool _printersLoaded = false;
 
-  static const sizes = {
+  static const defaultSizes = <String, (double, double)>{
     '38 × 25 mm': (38.0, 25.0),
     '80 × 16 mm': (80.0, 16.0),
     '100 × 30 mm': (100.0, 30.0),
     '60 × 150 mm': (60.0, 150.0),
   };
+  late final Map<String, (double, double)> sizes = {...defaultSizes};
+  final customLabelProfileStore = const CustomLabelProfileStore();
   @override
   void initState() {
     super.initState();
@@ -109,7 +113,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     ]) {
       controller.addListener(_refresh);
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadCustomLabelProfiles();
       _load();
       _loadPrinters();
       // Initialise stickersPerRow to the calculated max for the default label/code
@@ -173,11 +178,172 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     if (mounted) setState(() {});
   }
 
+  (String, String)? get _localProfileIdentity {
+    final session = ref.read(sessionProvider);
+    final tenantId = session.tenantId ?? WindowsSession.companyId;
+    final userId = session.userId ?? WindowsSession.userId;
+    if (tenantId == null || userId == null) return null;
+    return (tenantId, userId);
+  }
+
+  Future<void> _loadCustomLabelProfiles() async {
+    final identity = _localProfileIdentity;
+    if (identity == null) return;
+    try {
+      final profiles = await customLabelProfileStore.load(
+        tenantId: identity.$1,
+        userId: identity.$2,
+      );
+      if (!mounted) return;
+      setState(() {
+        sizes
+          ..clear()
+          ..addAll(defaultSizes);
+        for (final profile in profiles) {
+          sizes[_labelSizeName(profile.widthMm, profile.heightMm)] = (
+            profile.widthMm,
+            profile.heightMm,
+          );
+        }
+        if (!sizes.containsKey(labelSize)) labelSize = '100 × 30 mm';
+        stickersPerRow = maxStickersPerRow.clamp(1, 999);
+      });
+    } catch (error) {
+      if (mounted) _notice('Custom label sizes could not be loaded: $error');
+    }
+  }
+
+  Future<void> _addCustomLabelSize() async {
+    final identity = _localProfileIdentity;
+    if (identity == null) {
+      _notice('Please sign in before adding a custom label size');
+      return;
+    }
+    final width = TextEditingController();
+    final height = TextEditingController();
+    final result = await showDialog<(double, double)>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add custom label size'),
+        content: SizedBox(
+          width: 360,
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: width,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Width (mm)'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: height,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: const InputDecoration(labelText: 'Height (mm)'),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final widthMm = double.tryParse(width.text.trim());
+              final heightMm = double.tryParse(height.text.trim());
+              if (widthMm == null ||
+                  heightMm == null ||
+                  widthMm <= 0 ||
+                  heightMm <= 0 ||
+                  widthMm > 210 ||
+                  heightMm > 297) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Enter dimensions greater than 0 and within 210 × 297 mm.',
+                    ),
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext, (widthMm, heightMm));
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    width.dispose();
+    height.dispose();
+    if (result == null || !mounted) return;
+    final duplicate = sizes.values.any(
+      (size) =>
+          (size.$1 - result.$1).abs() < .001 &&
+          (size.$2 - result.$2).abs() < .001,
+    );
+    if (duplicate) {
+      _notice('That label size is already available');
+      return;
+    }
+    final name = _labelSizeName(result.$1, result.$2);
+    setState(() {
+      sizes[name] = result;
+      labelSize = name;
+      stickersPerRow = maxStickersPerRow.clamp(1, 999);
+    });
+    try {
+      await customLabelProfileStore.save(
+        tenantId: identity.$1,
+        userId: identity.$2,
+        profiles: [
+          for (final entry in sizes.entries)
+            if (!defaultSizes.containsKey(entry.key))
+              CustomLabelProfile(
+                widthMm: entry.value.$1,
+                heightMm: entry.value.$2,
+              ),
+        ],
+      );
+      _notice('$name added to label profiles');
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          sizes.remove(name);
+          labelSize = '100 × 30 mm';
+          stickersPerRow = maxStickersPerRow;
+        });
+        _notice('Custom label size could not be saved: $error');
+      }
+    }
+  }
+
+  String _labelSizeName(double width, double height) =>
+      '${_dimensionText(width)} × ${_dimensionText(height)} mm';
+
+  String _dimensionText(double value) {
+    if (value == value.roundToDouble()) return value.toInt().toString();
+    return value
+        .toStringAsFixed(2)
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
+  }
+
   void _backupImported() {
     if (!mounted) return;
     // Open a fresh platform connection so browser WASM/IndexedDB and native
     // SQLite readers cannot retain a pre-import snapshot.
     if (widget.repository == null) repository = _initRepository();
+    _loadCustomLabelProfiles();
     _load();
   }
 
@@ -447,13 +613,34 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        _dropdown('Label profile', labelSize, sizes.keys.toList(), (value) {
-          setState(() {
-            labelSize = value;
-            // Always reset to the new max when profile changes
-            stickersPerRow = (maxPageWidthMm / sizes[value]!.$1).floor();
-          });
-        }),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _dropdown(
+                'Label profile',
+                labelSize,
+                sizes.keys.toList(),
+                (value) {
+                  setState(() {
+                    labelSize = value;
+                    // Always reset to the new max when profile changes
+                    stickersPerRow = (maxPageWidthMm / sizes[value]!.$1)
+                        .floor()
+                        .clamp(1, 999);
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: 10),
+            IconButton.filledTonal(
+              key: const Key('add-custom-label-size'),
+              onPressed: busy ? null : _addCustomLabelSize,
+              tooltip: 'Add custom label size',
+              icon: const Icon(Icons.add),
+            ),
+          ],
+        ),
         const SizedBox(height: 12),
         _dropdown(
           'Stickers per row',
