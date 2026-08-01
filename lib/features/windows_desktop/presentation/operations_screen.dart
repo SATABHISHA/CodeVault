@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../shared/widgets/app_text_field.dart';
 import '../../../shared/widgets/label_preview.dart';
+import '../../labels/domain/label_typography.dart';
 import '../domain/printer.dart';
 
 class WindowsOperationsScreen extends StatefulWidget {
@@ -98,17 +99,11 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
             ),
             SizedBox(
               width: 220,
-              child: AppTextField(
-                label: 'Date (DD-MM-YYYY)',
-                controller: date,
-              ),
+              child: AppTextField(label: 'Date (DD-MM-YYYY)', controller: date),
             ),
             SizedBox(
               width: 220,
-              child: AppTextField(
-                label: 'Time (HH:MM:SS)',
-                controller: time,
-              ),
+              child: AppTextField(label: 'Time (HH:MM:SS)', controller: time),
             ),
             SizedBox(
               width: 180,
@@ -180,37 +175,131 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
                 const SizedBox(height: 8),
                 LabelPreview(
                   content: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       if (dualSideCodes)
                         Row(
-                          children: const [
-                            Icon(Icons.qr_code_2, size: 28),
-                            Spacer(),
-                            Icon(Icons.qr_code_2, size: 28),
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.qr_code_2, size: 56),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    company.text.trim().isEmpty
+                                        ? 'COMPANY NAME'
+                                        : company.text.trim().toUpperCase(),
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing:
+                                          LabelTypography.companyTracking,
+                                    ),
+                                  ),
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'MODEL: ${model.text.isEmpty ? '-' : model.text.toUpperCase()}',
+                                        style: const TextStyle(
+                                          fontFamily:
+                                              LabelTypography.fontFamily,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      if (port.text.trim().isNotEmpty)
+                                        Text(
+                                          port.text.trim().toUpperCase(),
+                                          style: const TextStyle(
+                                            fontFamily:
+                                                LabelTypography.fontFamily,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  Text(
+                                    'DATE: ${date.text.isEmpty ? '-' : date.text}    TIME: ${time.text.isEmpty ? '-' : time.text}',
+                                    style: const TextStyle(
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    'PART NO: ${part.text.isEmpty ? '-' : part.text}',
+                                    style: const TextStyle(
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  Text(
+                                    content.isEmpty
+                                        ? 'Enter part and serial data'
+                                        : content,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.qr_code_2, size: 56),
                           ],
+                        )
+                      else ...[
+                        Text(
+                          company.text.trim().isEmpty
+                              ? 'COMPANY NAME'
+                              : company.text.trim().toUpperCase(),
+                          style: const TextStyle(
+                            fontFamily: LabelTypography.fontFamily,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      Text(
-                        company.text.trim().isEmpty
-                            ? 'COMPANY NAME'
-                            : company.text.trim().toUpperCase(),
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        'MODEL: ${model.text.isEmpty ? '-' : model.text.toUpperCase()}    ${port.text.isEmpty ? 'PORT -' : port.text.toUpperCase()}',
-                      ),
-                      Text(
-                        'DATE: ${date.text.isEmpty ? '-' : date.text}    TIME: ${time.text.isEmpty ? '-' : time.text}',
-                      ),
-                      Text(
-                        'PART NO: ${part.text.isEmpty ? '-' : part.text}',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        content.isEmpty ? 'Enter part and serial data' : content,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                        Text(
+                          port.text.trim().isEmpty
+                              ? 'MODEL: ${model.text.isEmpty ? '-' : model.text.toUpperCase()}'
+                              : 'MODEL: ${model.text.isEmpty ? '-' : model.text.toUpperCase()}    ${port.text.trim().toUpperCase()}',
+                          style: const TextStyle(
+                            fontFamily: LabelTypography.fontFamily,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'DATE: ${date.text.isEmpty ? '-' : date.text}    TIME: ${time.text.isEmpty ? '-' : time.text}',
+                          style: const TextStyle(
+                            fontFamily: LabelTypography.fontFamily,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'PART NO: ${part.text.isEmpty ? '-' : part.text}',
+                          style: const TextStyle(
+                            fontFamily: LabelTypography.fontFamily,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                      if (!dualSideCodes)
+                        Text(
+                          content.isEmpty
+                              ? 'Enter part and serial data'
+                              : content,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: LabelTypography.fontFamily,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -288,6 +377,9 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
   Future<void> _print({bool? withName}) async {
     final copies = int.tryParse(quantity.text) ?? 0;
     final include = withName ?? includeName;
+    final modelLine = port.text.trim().isEmpty
+        ? 'MODEL:${model.text}'
+        : 'MODEL:${model.text} ${port.text.trim()}';
     if (autoDateTime) {
       _stampNow();
     }
@@ -295,7 +387,7 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
       PrintRequest(
         jobId: const Uuid().v4(),
         content: include
-            ? '${company.text}\nMODEL:${model.text} ${port.text}\nDATE:${date.text} TIME:${time.text}\nPART:${part.text}\n$content'
+            ? '${company.text}\n$modelLine\nDATE:${date.text} TIME:${time.text}\nPART:${part.text}\n$content'
             : content,
         copies: copies,
       ),

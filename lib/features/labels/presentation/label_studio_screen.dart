@@ -5,7 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 
-import '../../../core/platform/platform_capabilities.dart' show PlatformCapabilities;
+import '../../../core/platform/platform_capabilities.dart'
+    show PlatformCapabilities;
 import '../../windows_desktop/application/windows_session.dart';
 import '../../windows_desktop/data/local_database.dart' show LocalDatabase;
 import '../../../features/printers/data/printing_browser_gateway.dart';
@@ -15,6 +16,7 @@ import '../application/production_activity.dart';
 import '../data/local_part_repository.dart';
 import '../data/part_repository.dart';
 import '../data/web_local_part_repository.dart';
+import '../domain/label_typography.dart';
 
 class LabelStudioScreen extends ConsumerStatefulWidget {
   const LabelStudioScreen({super.key, this.repository, this.printGateway});
@@ -41,6 +43,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     }
     return WebLocalPartRepository();
   }
+
   final search = TextEditingController();
   final partNumber = TextEditingController();
   final itemName = TextEditingController();
@@ -67,7 +70,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   int stickersPerRow = 1; // will be set to maxStickersPerRow in initState
   static const double maxPageWidthMm = 210.0;
   int get maxStickersPerRow => (maxPageWidthMm / sizes[labelSize]!.$1).floor();
-  
+
   String port = '';
   String message = 'Ready for production';
   Timer? debounce;
@@ -119,9 +122,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
           _availablePrinters = printers.where((p) => p.isAvailable).toList();
           if (_availablePrinters.isNotEmpty) {
             _selectedPrinter = _availablePrinters.cast<Printer?>().firstWhere(
-                  (p) => p!.isDefault,
-                  orElse: () => _availablePrinters.first,
-                );
+              (p) => p!.isDefault,
+              orElse: () => _availablePrinters.first,
+            );
             port = _selectedPrinter!.name;
           } else {
             port = 'System Default';
@@ -353,39 +356,43 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
             Expanded(
               child: _printersLoaded
                   ? _availablePrinters.isEmpty
-                      ? DropdownButtonFormField<String>(
-                          initialValue: 'System Default',
-                          isExpanded: true,
-                          decoration: const InputDecoration(labelText: 'Printer port'),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'System Default',
-                              child: Text('SYSTEM DEFAULT'),
-                            )
-                          ],
-                          onChanged: null,
-                        )
-                      : DropdownButtonFormField<Printer>(
-                          initialValue: _selectedPrinter,
-                          isExpanded: true,
-                          decoration: const InputDecoration(labelText: 'Printer port'),
-                          items: _availablePrinters
-                              .map(
-                                (item) => DropdownMenuItem(
-                                  value: item,
-                                  child: Text(item.name.toUpperCase()),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (next) {
-                            if (next != null) {
-                              setState(() {
-                                _selectedPrinter = next;
-                                port = next.name;
-                              });
-                            }
-                          },
-                        )
+                        ? DropdownButtonFormField<String>(
+                            initialValue: 'System Default',
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Printer port',
+                            ),
+                            items: const [
+                              DropdownMenuItem(
+                                value: 'System Default',
+                                child: Text('SYSTEM DEFAULT'),
+                              ),
+                            ],
+                            onChanged: null,
+                          )
+                        : DropdownButtonFormField<Printer>(
+                            initialValue: _selectedPrinter,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Printer port',
+                            ),
+                            items: _availablePrinters
+                                .map(
+                                  (item) => DropdownMenuItem(
+                                    value: item,
+                                    child: Text(item.name.toUpperCase()),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (next) {
+                              if (next != null) {
+                                setState(() {
+                                  _selectedPrinter = next;
+                                  port = next.name;
+                                });
+                              }
+                            },
+                          )
                   : const Padding(
                       padding: EdgeInsets.symmetric(vertical: 8),
                       child: Center(child: CircularProgressIndicator()),
@@ -428,18 +435,13 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        _dropdown(
-          'Label profile',
-          labelSize,
-          sizes.keys.toList(),
-          (value) {
-            setState(() {
-              labelSize = value;
-              // Always reset to the new max when profile changes
-              stickersPerRow = (maxPageWidthMm / sizes[value]!.$1).floor();
-            });
-          },
-        ),
+        _dropdown('Label profile', labelSize, sizes.keys.toList(), (value) {
+          setState(() {
+            labelSize = value;
+            // Always reset to the new max when profile changes
+            stickersPerRow = (maxPageWidthMm / sizes[value]!.$1).floor();
+          });
+        }),
         const SizedBox(height: 12),
         _dropdown(
           'Stickers per row',
@@ -456,7 +458,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           title: const Text('Dual left-right code layout'),
-          subtitle: const Text('Print the same code on left and right like the reference sticker'),
+          subtitle: const Text(
+            'Print the same code on left and right like the reference sticker',
+          ),
           value: dualSideCodes,
           onChanged: (value) {
             setState(() {
@@ -470,7 +474,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           title: const Text('Auto-fill date and time'),
-          subtitle: const Text('Uses current timestamp at PDF generation and printing'),
+          subtitle: const Text(
+            'Uses current timestamp at PDF generation and printing',
+          ),
           value: autoDateTime,
           onChanged: (value) {
             setState(() => autoDateTime = value);
@@ -592,6 +598,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
 
   Widget _preview(BuildContext context) {
     final profile = sizes[labelSize]!;
+    final portValue = portLabel.text.trim().toUpperCase();
     return _panel(
       context,
       title: 'Live label preview',
@@ -615,158 +622,221 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (dualSideCodes && codeSymbology != CodeSymbology.code128)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(
-                            width: 72,
-                            height: 72,
-                            child: BarcodeView(
-                              data: codeData,
-                              symbology: codeSymbology,
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (dualSideCodes && codeSymbology != CodeSymbology.code128)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 104,
+                              height: 104,
+                              child: BarcodeView(
+                                data: codeData,
+                                symbology: codeSymbology,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Text(
-                                  companyName.text.trim().isEmpty
-                                      ? 'COMPANY NAME'
-                                      : companyName.text.trim().toUpperCase(),
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                                Text(
-                                  'MODEL: ${model.text.isEmpty ? '-' : model.text.toUpperCase()}    ${portLabel.text.trim().isEmpty ? 'PORT -' : portLabel.text.trim().toUpperCase()}',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                                Text(
-                                  'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}    TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 10,
-                                  ),
-                                ),
-                                Text(
-                                  'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                if (includeName)
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Company — centered
                                   Text(
-                                    itemName.text.isEmpty ? '—' : itemName.text,
+                                    companyName.text.trim().isEmpty
+                                        ? 'COMPANY NAME'
+                                        : companyName.text.trim().toUpperCase(),
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       color: Colors.black,
-                                      fontSize: 10,
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 13,
+                                      letterSpacing:
+                                          LabelTypography.companyTracking,
+                                      height: 1.05,
                                     ),
                                   ),
-                              ],
+                                  // MODEL left  ·  PORT right
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'MODEL: ${model.text.trim().isEmpty ? '-' : model.text.trim().toUpperCase()}',
+                                        style: const TextStyle(
+                                          color: Colors.black,
+                                          fontFamily:
+                                              LabelTypography.fontFamily,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10,
+                                          letterSpacing:
+                                              LabelTypography.textTracking,
+                                          height: 1.15,
+                                        ),
+                                      ),
+                                      if (portLabel.text.trim().isNotEmpty)
+                                        Text(
+                                          portLabel.text.trim().toUpperCase(),
+                                          style: const TextStyle(
+                                            color: Colors.black,
+                                            fontFamily:
+                                                LabelTypography.fontFamily,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 10,
+                                            letterSpacing:
+                                                LabelTypography.textTracking,
+                                            height: 1.15,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  // DATE + TIME — left
+                                  Text(
+                                    'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}    TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
+                                    textAlign: TextAlign.left,
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.15,
+                                    ),
+                                  ),
+                                  // PART NO — left, bold
+                                  Text(
+                                    'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
+                                    textAlign: TextAlign.left,
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.1,
+                                    ),
+                                  ),
+                                  if (includeName)
+                                    Text(
+                                      itemName.text.isEmpty
+                                          ? '—'
+                                          : itemName.text,
+                                      textAlign: TextAlign.left,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: LabelTypography.fontFamily,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10,
+                                        letterSpacing:
+                                            LabelTypography.textTracking,
+                                        height: 1.15,
+                                      ),
+                                    ),
+                                  Text(
+                                    codeData,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 10,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.15,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          SizedBox(
-                            width: 72,
-                            height: 72,
-                            child: BarcodeView(
-                              data: codeData,
-                              symbology: codeSymbology,
+                            const SizedBox(width: 10),
+                            SizedBox(
+                              width: 104,
+                              height: 104,
+                              child: BarcodeView(
+                                data: codeData,
+                                symbology: codeSymbology,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        codeData,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontFamily: 'monospace',
-                          fontSize: 10,
+                          ],
                         ),
-                      ),
-                    ],
-                  )
-                else ...[
-                  Text(
-                    companyName.text.trim().isEmpty
-                        ? 'COMPANY NAME'
-                        : companyName.text.trim().toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 15,
-                    ),
-                  ),
-                  Text(
-                    companyAddress.text.trim().isEmpty
-                        ? 'COMPANY ADDRESS'
-                        : companyAddress.text.trim().toUpperCase(),
-                    style: const TextStyle(color: Colors.black54, fontSize: 9),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  if (includeName)
+                      ],
+                    )
+                  else ...[
                     Text(
-                      'ITEM: ${itemName.text.isEmpty ? '—' : itemName.text}',
-                      style: const TextStyle(color: Colors.black),
+                      companyName.text.trim().isEmpty
+                          ? 'COMPANY NAME'
+                          : companyName.text.trim().toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 15,
+                      ),
                     ),
-                  Text(
-                    'MODEL: ${model.text.isEmpty ? '—' : model.text}   ${portLabel.text.trim().isEmpty ? '-' : portLabel.text.trim()}',
-                    style: const TextStyle(color: Colors.black, fontSize: 11),
-                  ),
-                  Text(
-                    'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}   TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
-                    style: const TextStyle(color: Colors.black, fontSize: 10),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    height: 105,
-                    width: double.infinity,
-                    child: BarcodeView(data: codeData, symbology: codeSymbology),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    codeData,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.black,
-                      fontFamily: 'monospace',
-                      fontSize: 10,
+                    Text(
+                      companyAddress.text.trim().isEmpty
+                          ? 'COMPANY ADDRESS'
+                          : companyAddress.text.trim().toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 9,
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (includeName)
+                      Text(
+                        'ITEM: ${itemName.text.isEmpty ? '—' : itemName.text}',
+                        style: const TextStyle(color: Colors.black),
+                      ),
+                    Text(
+                      portValue.isEmpty
+                          ? 'MODEL: ${model.text.isEmpty ? '—' : model.text}'
+                          : 'MODEL: ${model.text.isEmpty ? '—' : model.text}   ${portLabel.text.trim()}',
+                      style: const TextStyle(color: Colors.black, fontSize: 11),
+                    ),
+                    Text(
+                      'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}   TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
+                      style: const TextStyle(color: Colors.black, fontSize: 10),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 105,
+                      width: double.infinity,
+                      child: BarcodeView(
+                        data: codeData,
+                        symbology: codeSymbology,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      codeData,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -1038,7 +1108,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       if (autoDateTime) {
         _stampNow();
       }
-      final bytes = await const BrowserPdfGenerator().generate(_getDocument(withName ?? includeName));
+      final bytes = await const BrowserPdfGenerator().generate(
+        _getDocument(withName ?? includeName),
+      );
       await gateway.download(bytes, 'codevault-${partNumber.text}.pdf');
       _notice('Label PDF generated');
     } catch (error) {
@@ -1059,14 +1131,19 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       if (autoDateTime) {
         _stampNow();
       }
-      final bytes = await const BrowserPdfGenerator().generate(_getDocument(withName ?? includeName));
+      final bytes = await const BrowserPdfGenerator().generate(
+        _getDocument(withName ?? includeName),
+      );
       if (_selectedPrinter != null) {
         await Printing.directPrintPdf(
           printer: _selectedPrinter!,
           onLayout: (format) async => bytes,
         );
       } else {
-        await gateway.showPrintDialog(bytes, 'codevault-${partNumber.text}.pdf');
+        await gateway.showPrintDialog(
+          bytes,
+          'codevault-${partNumber.text}.pdf',
+        );
       }
       ref.read(productionActivityProvider.notifier).recordPrint(copies);
       _notice('$copies label${copies == 1 ? '' : 's'} sent to print');

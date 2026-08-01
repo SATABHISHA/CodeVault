@@ -3,6 +3,9 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:barcode/barcode.dart';
+import 'package:flutter/services.dart' show rootBundle;
+
+import '../../labels/domain/label_typography.dart';
 
 class BrowserLabelDocument {
   const BrowserLabelDocument({
@@ -48,6 +51,9 @@ class BrowserPdfGenerator {
 
   Future<Uint8List> generate(BrowserLabelDocument label) async {
     final document = pw.Document();
+    final labelFont = pw.Font.ttf(
+      await rootBundle.load(LabelTypography.fontAsset),
+    );
     final twinCodes = label.dualSideCodes && label.symbology != 'code128';
 
     // ── Label dimensions in PDF points ──────────────────────────────────────
@@ -67,32 +73,32 @@ class BrowserPdfGenerator {
     // Scale fonts so they always fit within the label, regardless of size.
     // Base is 100% at 30 mm height; scale linearly with height.
     final scale = (label.heightMm / 30.0).clamp(0.5, 2.0);
-    final fCompany  = (8.0 * scale).clamp(4.0, 10.0);
-    final fSmall    = (6.0 * scale).clamp(3.5,  8.0);
-    final fTitle    = (7.0 * scale).clamp(4.0,  9.0);
-    final fContent  = (5.0 * scale).clamp(3.0,  7.0);
-    final pad       = (4.0 * scale).clamp(2.0,  6.0);
-    final gap       = (3.0 * scale).clamp(1.0,  5.0);
+    final fCompany = (8.0 * scale).clamp(4.0, 10.0);
+    final fSmall = (6.0 * scale).clamp(3.5, 8.0);
+    final fTitle = (7.0 * scale).clamp(4.0, 9.0);
+    final fContent = (5.0 * scale).clamp(3.0, 7.0);
+    final pad = (4.0 * scale).clamp(2.0, 6.0);
+    final gap = (3.0 * scale).clamp(1.0, 5.0);
 
     final innerW = wPt - pad * 2;
     final innerH = hPt - pad * 2;
-    final twinSide = (innerH * 0.68).clamp(innerH * 0.50, innerW * 0.24);
+    final twinSide = (innerH * 0.50).clamp(innerH * 0.44, innerW * 0.20);
     final centerW = (innerW - (twinSide * 2) - (gap * 2)).clamp(10.0, innerW);
 
     // ── Estimate text block height ───────────────────────────────────────────
     final numTextLines = twinCodes
-      ? 4 + (label.itemName.isNotEmpty ? 1 : 0)
-      : 1 +
-          (label.companyAddress.isNotEmpty ? 1 : 0) +
-          1 +
-          (label.itemName.isNotEmpty ? 1 : 0) +
-          (label.model.isNotEmpty ? 1 : 0) +
-          ((label.port.isNotEmpty ||
-              label.dateText.isNotEmpty ||
-              label.timeText.isNotEmpty)
-            ? 1
-            : 0) +
-          1;
+        ? 4 + (label.itemName.isNotEmpty ? 1 : 0)
+        : 1 +
+              (label.companyAddress.isNotEmpty ? 1 : 0) +
+              1 +
+              (label.itemName.isNotEmpty ? 1 : 0) +
+              (label.model.isNotEmpty ? 1 : 0) +
+              ((label.port.isNotEmpty ||
+                      label.dateText.isNotEmpty ||
+                      label.timeText.isNotEmpty)
+                  ? 1
+                  : 0) +
+              1;
     final avgLineH = ((fCompany + fSmall + fTitle + fContent) / 4.0);
     final textBlockH = numTextLines * avgLineH + gap * 2;
 
@@ -113,126 +119,176 @@ class BrowserPdfGenerator {
         ),
         padding: pw.EdgeInsets.all(pad),
         child: pw.Column(
+          mainAxisAlignment: twinCodes
+              ? pw.MainAxisAlignment.center
+              : pw.MainAxisAlignment.start,
           crossAxisAlignment: pw.CrossAxisAlignment.start,
-          mainAxisSize: pw.MainAxisSize.min,
+          mainAxisSize: twinCodes ? pw.MainAxisSize.max : pw.MainAxisSize.min,
           children: [
-          if (twinCodes)
-            ...[
+            if (twinCodes) ...[
               pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
                 children: [
-                  _buildSquareCode(
-                    label: label,
-                    side: twinSide,
-                  ),
+                  _buildSquareCode(label: label, side: twinSide),
                   pw.SizedBox(width: gap),
                   pw.SizedBox(
                     width: centerW,
                     child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                       children: [
+                        // Company name — centered
                         pw.Text(
-                          label.company.isEmpty ? 'COMPANY' : label.company.toUpperCase(),
+                          label.company.isEmpty
+                              ? 'COMPANY'
+                              : label.company.toUpperCase(),
                           textAlign: pw.TextAlign.center,
                           style: pw.TextStyle(
+                            font: labelFont,
                             fontWeight: pw.FontWeight.bold,
                             fontSize: fCompany,
+                            letterSpacing: LabelTypography.companyTracking,
                           ),
                         ),
-                        pw.Text(
-                          'MODEL: ${label.model.isEmpty ? '-' : label.model.toUpperCase()}    ${label.port.isEmpty ? 'PORT -' : label.port.toUpperCase()}',
-                          textAlign: pw.TextAlign.center,
-                          style: pw.TextStyle(fontSize: fSmall),
+                        // MODEL left  ·  PORT right
+                        pw.Row(
+                          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                          children: [
+                            pw.Text(
+                              'MODEL: ${label.model.trim().isEmpty ? '-' : label.model.trim().toUpperCase()}',
+                              style: pw.TextStyle(
+                                font: labelFont,
+                                fontWeight: pw.FontWeight.bold,
+                                fontSize: fSmall,
+                                letterSpacing: LabelTypography.textTracking,
+                              ),
+                            ),
+                            if (label.port.trim().isNotEmpty)
+                              pw.Text(
+                                label.port.trim().toUpperCase(),
+                                style: pw.TextStyle(
+                                  font: labelFont,
+                                  fontWeight: pw.FontWeight.bold,
+                                  fontSize: fSmall,
+                                  letterSpacing: LabelTypography.textTracking,
+                                ),
+                              ),
+                          ],
                         ),
+                        // DATE + TIME — left
                         pw.Text(
                           'DATE: ${label.dateText.isEmpty ? '-' : label.dateText}    TIME: ${label.timeText.isEmpty ? '-' : label.timeText}',
-                          textAlign: pw.TextAlign.center,
-                          style: pw.TextStyle(fontSize: fSmall),
+                          textAlign: pw.TextAlign.left,
+                          style: pw.TextStyle(
+                            font: labelFont,
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: fSmall,
+                            letterSpacing: LabelTypography.textTracking,
+                          ),
                         ),
+                        // PART NO — left, bold
                         pw.Text(
                           'PART NO: ${label.partNumber.isEmpty ? '-' : label.partNumber}',
-                          textAlign: pw.TextAlign.center,
+                          textAlign: pw.TextAlign.left,
                           style: pw.TextStyle(
+                            font: labelFont,
                             fontWeight: pw.FontWeight.bold,
                             fontSize: fTitle,
+                            letterSpacing: LabelTypography.textTracking,
                           ),
                         ),
                         if (label.itemName.isNotEmpty)
                           pw.Text(
                             label.itemName,
-                            textAlign: pw.TextAlign.center,
-                            style: pw.TextStyle(fontSize: fSmall),
+                            textAlign: pw.TextAlign.left,
+                            style: pw.TextStyle(
+                              font: labelFont,
+                              fontWeight: pw.FontWeight.bold,
+                              fontSize: fSmall,
+                              letterSpacing: LabelTypography.textTracking,
+                            ),
                           ),
+                        pw.Text(
+                          label.content,
+                          maxLines: 1,
+                          overflow: pw.TextOverflow.clip,
+                          style: pw.TextStyle(
+                            font: labelFont,
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: fContent,
+                            letterSpacing: LabelTypography.textTracking,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   pw.SizedBox(width: gap),
-                  _buildSquareCode(
-                    label: label,
-                    side: twinSide,
-                  ),
+                  _buildSquareCode(label: label, side: twinSide),
                 ],
+              ),
+            ] else ...[
+              pw.Text(
+                label.company,
+                style: pw.TextStyle(
+                  font: labelFont,
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: fCompany,
+                ),
+              ),
+              if (label.companyAddress.isNotEmpty)
+                pw.Text(
+                  label.companyAddress,
+                  style: pw.TextStyle(
+                    font: labelFont,
+                    fontSize: fSmall,
+                    color: PdfColors.grey700,
+                  ),
+                ),
+              pw.Text(
+                label.title,
+                style: pw.TextStyle(
+                  font: labelFont,
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: fTitle,
+                ),
+              ),
+              if (label.itemName.isNotEmpty)
+                pw.Text(
+                  'ITEM: ${label.itemName}',
+                  style: pw.TextStyle(font: labelFont, fontSize: fSmall),
+                ),
+              if (label.model.isNotEmpty || label.port.isNotEmpty)
+                pw.Text(
+                  'MODEL: ${label.model.isEmpty ? '-' : label.model}${label.port.isEmpty ? '' : '    ${label.port}'}',
+                  style: pw.TextStyle(font: labelFont, fontSize: fSmall),
+                ),
+              if (label.dateText.isNotEmpty || label.timeText.isNotEmpty)
+                pw.Text(
+                  'DATE: ${label.dateText.isEmpty ? '-' : label.dateText}    TIME: ${label.timeText.isEmpty ? '-' : label.timeText}',
+                  style: pw.TextStyle(font: labelFont, fontSize: fSmall),
+                ),
+              pw.SizedBox(height: gap),
+              // Barcode box — strictly fixed width×height, never expands
+              pw.SizedBox(
+                width: barcodeW,
+                height: barcodeH,
+                child: pw.BarcodeWidget(
+                  barcode: _barcodeFor(label.symbology),
+                  data: label.content,
+                  drawText: false,
+                ),
               ),
               pw.SizedBox(height: gap * 0.5),
               pw.Text(
                 label.content,
                 maxLines: 1,
                 overflow: pw.TextOverflow.clip,
-                style: pw.TextStyle(fontSize: fContent),
+                style: pw.TextStyle(font: labelFont, fontSize: fContent),
               ),
-            ]
-          else ...[
-            pw.Text(
-              label.company,
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: fCompany),
-            ),
-            if (label.companyAddress.isNotEmpty)
-              pw.Text(
-                label.companyAddress,
-                style: pw.TextStyle(fontSize: fSmall, color: PdfColors.grey700),
-              ),
-            pw.Text(
-              label.title,
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: fTitle),
-            ),
-            if (label.itemName.isNotEmpty)
-              pw.Text(
-                'ITEM: ${label.itemName}',
-                style: pw.TextStyle(fontSize: fSmall),
-              ),
-            if (label.model.isNotEmpty || label.port.isNotEmpty)
-              pw.Text(
-                'MODEL: ${label.model.isEmpty ? '-' : label.model}${label.port.isEmpty ? '' : '    ${label.port}'}',
-                style: pw.TextStyle(fontSize: fSmall),
-              ),
-            if (label.dateText.isNotEmpty || label.timeText.isNotEmpty)
-              pw.Text(
-                'DATE: ${label.dateText.isEmpty ? '-' : label.dateText}    TIME: ${label.timeText.isEmpty ? '-' : label.timeText}',
-                style: pw.TextStyle(fontSize: fSmall),
-              ),
-            pw.SizedBox(height: gap),
-            // Barcode box — strictly fixed width×height, never expands
-            pw.SizedBox(
-              width: barcodeW,
-              height: barcodeH,
-              child: pw.BarcodeWidget(
-                barcode: _barcodeFor(label.symbology),
-                data: label.content,
-                drawText: false,
-              ),
-            ),
-            pw.SizedBox(height: gap * 0.5),
-            pw.Text(
-              label.content,
-              maxLines: 1,
-              overflow: pw.TextOverflow.clip,
-              style: pw.TextStyle(fontSize: fContent),
-            ),
+            ],
           ],
-        ],
         ),
-      ),   // Container
-    );     // ClipRect
+      ), // Container
+    ); // ClipRect
 
     // ── Page builder ─────────────────────────────────────────────────────────
     // Divide stickers across A4 pages. Each sticker occupies exactly wPt×hPt
@@ -289,7 +345,9 @@ class BrowserPdfGenerator {
     width: side,
     height: side,
     child: pw.BarcodeWidget(
-      barcode: _barcodeFor(label.symbology == 'code128' ? 'qr' : label.symbology),
+      barcode: _barcodeFor(
+        label.symbology == 'code128' ? 'qr' : label.symbology,
+      ),
       data: label.content,
       drawText: false,
     ),
