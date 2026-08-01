@@ -7,6 +7,7 @@ import 'package:path/path.dart' as path;
 import '../../../platform/windows/data/bootstrap_store.dart';
 import '../../windows_desktop/application/local_backup_service.dart';
 import '../../windows_desktop/data/local_database.dart';
+import '../application/backup_import_revision.dart';
 
 class LocalBackupPanel extends StatefulWidget {
   const LocalBackupPanel({required this.userId, super.key});
@@ -119,8 +120,11 @@ class _LocalBackupPanelState extends State<LocalBackupPanel> {
       if (manifest.companyId != value.$1) {
         throw StateError('This backup belongs to another company.');
       }
-      if (manifest.ownerUserId != null && manifest.ownerUserId != widget.userId) {
-        throw StateError('This backup belongs to another signed-in user account.');
+      if (manifest.ownerUserId != null &&
+          manifest.ownerUserId != widget.userId) {
+        throw StateError(
+          'This backup belongs to another signed-in user account.',
+        );
       }
       if (mode == RestoreMode.merge) {
         final database = LocalDatabase(value.$1);
@@ -129,6 +133,7 @@ class _LocalBackupPanelState extends State<LocalBackupPanel> {
             source: File(source.path),
             target: database,
           );
+          notifyBackupImported();
           return 'Merge complete: ${report.values.fold<int>(0, (a, b) => a + b)} new records; existing records kept.';
         } finally {
           await database.close();
@@ -138,6 +143,7 @@ class _LocalBackupPanelState extends State<LocalBackupPanel> {
         source: File(source.path),
         currentDatabase: value.$2,
       );
+      notifyBackupImported();
       return 'Database replaced. Safety copy: ${safety.path}';
     });
   }

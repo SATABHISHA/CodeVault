@@ -12,6 +12,7 @@ import '../../sync/data/android_cache_database.dart';
 import '../../windows_desktop/application/windows_session.dart';
 import '../../windows_desktop/data/local_database.dart' show LocalDatabase;
 import '../../../core/platform/platform_capabilities.dart';
+import '../../backup/application/backup_import_revision.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -198,22 +199,28 @@ class _PartsMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activeTenant = tenantId ?? WindowsSession.companyId;
-    return FutureBuilder<int>(
-      future: activeTenant == null
-          ? Future.value(0)
-          : _getRepo(activeTenant).list(activeTenant).then((value) => value.length),
-      builder: (context, snapshot) => _Metric(
-        icon: Icons.inventory_2_rounded,
-        color: const Color(0xFF6D5DFB),
-        label: 'Active parts',
-        value: snapshot.hasError
-            ? '0'
-            : snapshot.hasData
-            ? '${snapshot.data}'
-            : '…',
-        detail: snapshot.hasError
-            ? 'Tenant data could not be loaded'
-            : 'Available for production',
+    return ValueListenableBuilder<int>(
+      valueListenable: backupImportRevision,
+      builder: (context, revision, child) => FutureBuilder<int>(
+        key: ValueKey((activeTenant, revision)),
+        future: activeTenant == null
+            ? Future.value(0)
+            : _getRepo(
+                activeTenant,
+              ).list(activeTenant).then((value) => value.length),
+        builder: (context, snapshot) => _Metric(
+          icon: Icons.inventory_2_rounded,
+          color: const Color(0xFF6D5DFB),
+          label: 'Active parts',
+          value: snapshot.hasError
+              ? '0'
+              : snapshot.hasData
+              ? '${snapshot.data}'
+              : '…',
+          detail: snapshot.hasError
+              ? 'Tenant data could not be loaded'
+              : 'Available for production',
+        ),
       ),
     );
   }
@@ -304,43 +311,51 @@ class _ProductionChart extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(7, (index) {
                 final date = DateTime.now().subtract(Duration(days: 6 - index));
-                final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                final weekdays = [
+                  'Mon',
+                  'Tue',
+                  'Wed',
+                  'Thu',
+                  'Fri',
+                  'Sat',
+                  'Sun',
+                ];
                 final label = weekdays[date.weekday - 1];
                 final isToday = index == 6;
                 final height = (isToday && total > 0) ? 1.0 : 0.04;
                 return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 5),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Expanded(
-                            child: Align(
-                              alignment: Alignment.bottomCenter,
-                              child: FractionallySizedBox(
-                                heightFactor: height,
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      begin: Alignment.bottomCenter,
-                                      end: Alignment.topCenter,
-                                      colors: [
-                                        Color(0xFF6047F5),
-                                        Color(0xFF00BCD4),
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Align(
+                            alignment: Alignment.bottomCenter,
+                            child: FractionallySizedBox(
+                              heightFactor: height,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                    colors: [
+                                      Color(0xFF6047F5),
+                                      Color(0xFF00BCD4),
+                                    ],
                                   ),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(height: 7),
-                          Text(
-                            label,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          label,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ],
                     ),
                   ),
                 );

@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../sync/application/web_local_export_service.dart';
 import '../../sync/data/android_cache_database.dart';
+import '../application/backup_import_revision.dart';
 
 class WebCacheTransferCard extends StatefulWidget {
   const WebCacheTransferCard({
@@ -85,9 +86,7 @@ class _WebCacheTransferCardState extends State<WebCacheTransferCard> {
         ? AndroidCacheDatabase.forWeb(widget.tenantId)
         : AndroidCacheDatabase(widget.tenantId);
     try {
-      final bytes = await WebLocalExportService(
-        database,
-      ).export(
+      final bytes = await WebLocalExportService(database).export(
         widget.tenantId,
         await _generation(database),
         ownerUserId: widget.userId,
@@ -118,10 +117,18 @@ class _WebCacheTransferCardState extends State<WebCacheTransferCard> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Replace local company data?'),
-        content: const Text('Only the signed-in company’s local cache will be replaced. Laravel data and other companies are unaffected.'),
+        content: const Text(
+          'Only the signed-in company’s local cache will be replaced. Laravel data and other companies are unaffected.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Replace')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Replace'),
+          ),
         ],
       ),
     );
@@ -147,6 +154,7 @@ class _WebCacheTransferCardState extends State<WebCacheTransferCard> {
         serverGeneration: await _generation(database),
         replace: replace,
       );
+      notifyBackupImported();
       if (mounted) {
         setState(
           () => status =

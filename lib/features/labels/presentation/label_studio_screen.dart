@@ -12,6 +12,7 @@ import '../../windows_desktop/data/local_database.dart' show LocalDatabase;
 import '../../../features/printers/data/printing_browser_gateway.dart';
 import '../../../features/printers/domain/browser_printing.dart';
 import '../../../shared/widgets/barcode_view.dart';
+import '../../backup/application/backup_import_revision.dart';
 import '../application/production_activity.dart';
 import '../data/local_part_repository.dart';
 import '../data/part_repository.dart';
@@ -28,7 +29,7 @@ class LabelStudioScreen extends ConsumerStatefulWidget {
 }
 
 class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
-  late final PartRepository repository = _initRepository();
+  late PartRepository repository = _initRepository();
   late final BrowserPrintGateway gateway =
       widget.printGateway ?? const PrintingBrowserGateway();
 
@@ -91,6 +92,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     companyAddress.text = WindowsSession.companyAddress;
     _stampNow();
     search.addListener(_searchChanged);
+    backupImportRevision.addListener(_backupImported);
     for (final controller in [
       partNumber,
       itemName,
@@ -145,6 +147,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   @override
   void dispose() {
     debounce?.cancel();
+    backupImportRevision.removeListener(_backupImported);
     search.dispose();
     for (final controller in [
       partNumber,
@@ -167,6 +170,14 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
 
   void _refresh() {
     if (mounted) setState(() {});
+  }
+
+  void _backupImported() {
+    if (!mounted) return;
+    // Open a fresh platform connection so browser WASM/IndexedDB and native
+    // SQLite readers cannot retain a pre-import snapshot.
+    if (widget.repository == null) repository = _initRepository();
+    _load();
   }
 
   String get codeData {

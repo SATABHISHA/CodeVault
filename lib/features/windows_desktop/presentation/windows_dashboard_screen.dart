@@ -2,6 +2,7 @@ import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../backup/application/backup_import_revision.dart';
 import '../application/windows_session.dart';
 import '../data/local_database.dart';
 
@@ -12,7 +13,23 @@ class WindowsDashboardScreen extends StatefulWidget {
 }
 
 class _WindowsDashboardScreenState extends State<WindowsDashboardScreen> {
-  late final Future<_LocalMetrics> metrics = _load();
+  late Future<_LocalMetrics> metrics = _load();
+
+  @override
+  void initState() {
+    super.initState();
+    backupImportRevision.addListener(_backupImported);
+  }
+
+  @override
+  void dispose() {
+    backupImportRevision.removeListener(_backupImported);
+    super.dispose();
+  }
+
+  void _backupImported() {
+    if (mounted) setState(() => metrics = _load());
+  }
 
   Future<_LocalMetrics> _load() async {
     final companyId = WindowsSession.companyId;
