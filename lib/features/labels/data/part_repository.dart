@@ -10,6 +10,8 @@ class PartRecord {
     required this.packQuantity,
     required this.barcodeType,
     required this.version,
+    this.labelCompanyName = '',
+    this.labelCompanyAddress = '',
   });
 
   factory PartRecord.fromJson(Map<String, dynamic> json) => PartRecord(
@@ -21,6 +23,14 @@ class PartRecord {
     packQuantity: json['default_pack_quantity'] as int? ?? 1,
     barcodeType: json['barcode_type'] as String? ?? 'code128',
     version: json['version'] as int? ?? 1,
+    labelCompanyName:
+        json['label_company_name'] as String? ??
+        json['company_name'] as String? ??
+        '',
+    labelCompanyAddress:
+        json['label_company_address'] as String? ??
+        json['company_address'] as String? ??
+        '',
   );
 
   final String id;
@@ -31,6 +41,8 @@ class PartRecord {
   final int packQuantity;
   final String barcodeType;
   final int version;
+  final String labelCompanyName;
+  final String labelCompanyAddress;
 }
 
 /// Abstract interface — implemented by [CloudPartRepository] (web/mobile) and

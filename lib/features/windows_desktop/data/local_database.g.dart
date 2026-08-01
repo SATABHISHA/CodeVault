@@ -1875,6 +1875,28 @@ class $PartsTable extends Parts with TableInfo<$PartsTable, Part> {
     requiredDuringInsert: false,
     defaultValue: const Constant('code128'),
   );
+  static const VerificationMeta _labelCompanyNameMeta = const VerificationMeta(
+    'labelCompanyName',
+  );
+  @override
+  late final GeneratedColumn<String> labelCompanyName = GeneratedColumn<String>(
+    'label_company_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _labelCompanyAddressMeta =
+      const VerificationMeta('labelCompanyAddress');
+  @override
+  late final GeneratedColumn<String> labelCompanyAddress =
+      GeneratedColumn<String>(
+        'label_company_address',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _activeMeta = const VerificationMeta('active');
   @override
   late final GeneratedColumn<bool> active = GeneratedColumn<bool>(
@@ -1910,6 +1932,8 @@ class $PartsTable extends Parts with TableInfo<$PartsTable, Part> {
     defaultDrCode,
     defaultPackQuantity,
     barcodeType,
+    labelCompanyName,
+    labelCompanyAddress,
     active,
     updatedAt,
   ];
@@ -1988,6 +2012,24 @@ class $PartsTable extends Parts with TableInfo<$PartsTable, Part> {
         ),
       );
     }
+    if (data.containsKey('label_company_name')) {
+      context.handle(
+        _labelCompanyNameMeta,
+        labelCompanyName.isAcceptableOrUnknown(
+          data['label_company_name']!,
+          _labelCompanyNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('label_company_address')) {
+      context.handle(
+        _labelCompanyAddressMeta,
+        labelCompanyAddress.isAcceptableOrUnknown(
+          data['label_company_address']!,
+          _labelCompanyAddressMeta,
+        ),
+      );
+    }
     if (data.containsKey('active')) {
       context.handle(
         _activeMeta,
@@ -2041,6 +2083,14 @@ class $PartsTable extends Parts with TableInfo<$PartsTable, Part> {
         DriftSqlType.string,
         data['${effectivePrefix}barcode_type'],
       )!,
+      labelCompanyName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label_company_name'],
+      ),
+      labelCompanyAddress: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label_company_address'],
+      ),
       active: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}active'],
@@ -2067,6 +2117,8 @@ class Part extends DataClass implements Insertable<Part> {
   final String? defaultDrCode;
   final int defaultPackQuantity;
   final String barcodeType;
+  final String? labelCompanyName;
+  final String? labelCompanyAddress;
   final bool active;
   final DateTime updatedAt;
   const Part({
@@ -2078,6 +2130,8 @@ class Part extends DataClass implements Insertable<Part> {
     this.defaultDrCode,
     required this.defaultPackQuantity,
     required this.barcodeType,
+    this.labelCompanyName,
+    this.labelCompanyAddress,
     required this.active,
     required this.updatedAt,
   });
@@ -2098,6 +2152,12 @@ class Part extends DataClass implements Insertable<Part> {
     }
     map['default_pack_quantity'] = Variable<int>(defaultPackQuantity);
     map['barcode_type'] = Variable<String>(barcodeType);
+    if (!nullToAbsent || labelCompanyName != null) {
+      map['label_company_name'] = Variable<String>(labelCompanyName);
+    }
+    if (!nullToAbsent || labelCompanyAddress != null) {
+      map['label_company_address'] = Variable<String>(labelCompanyAddress);
+    }
     map['active'] = Variable<bool>(active);
     map['updated_at'] = Variable<DateTime>(updatedAt);
     return map;
@@ -2119,6 +2179,12 @@ class Part extends DataClass implements Insertable<Part> {
           : Value(defaultDrCode),
       defaultPackQuantity: Value(defaultPackQuantity),
       barcodeType: Value(barcodeType),
+      labelCompanyName: labelCompanyName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(labelCompanyName),
+      labelCompanyAddress: labelCompanyAddress == null && nullToAbsent
+          ? const Value.absent()
+          : Value(labelCompanyAddress),
       active: Value(active),
       updatedAt: Value(updatedAt),
     );
@@ -2140,6 +2206,10 @@ class Part extends DataClass implements Insertable<Part> {
         json['defaultPackQuantity'],
       ),
       barcodeType: serializer.fromJson<String>(json['barcodeType']),
+      labelCompanyName: serializer.fromJson<String?>(json['labelCompanyName']),
+      labelCompanyAddress: serializer.fromJson<String?>(
+        json['labelCompanyAddress'],
+      ),
       active: serializer.fromJson<bool>(json['active']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
     );
@@ -2156,6 +2226,8 @@ class Part extends DataClass implements Insertable<Part> {
       'defaultDrCode': serializer.toJson<String?>(defaultDrCode),
       'defaultPackQuantity': serializer.toJson<int>(defaultPackQuantity),
       'barcodeType': serializer.toJson<String>(barcodeType),
+      'labelCompanyName': serializer.toJson<String?>(labelCompanyName),
+      'labelCompanyAddress': serializer.toJson<String?>(labelCompanyAddress),
       'active': serializer.toJson<bool>(active),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
     };
@@ -2170,6 +2242,8 @@ class Part extends DataClass implements Insertable<Part> {
     Value<String?> defaultDrCode = const Value.absent(),
     int? defaultPackQuantity,
     String? barcodeType,
+    Value<String?> labelCompanyName = const Value.absent(),
+    Value<String?> labelCompanyAddress = const Value.absent(),
     bool? active,
     DateTime? updatedAt,
   }) => Part(
@@ -2183,6 +2257,12 @@ class Part extends DataClass implements Insertable<Part> {
         : this.defaultDrCode,
     defaultPackQuantity: defaultPackQuantity ?? this.defaultPackQuantity,
     barcodeType: barcodeType ?? this.barcodeType,
+    labelCompanyName: labelCompanyName.present
+        ? labelCompanyName.value
+        : this.labelCompanyName,
+    labelCompanyAddress: labelCompanyAddress.present
+        ? labelCompanyAddress.value
+        : this.labelCompanyAddress,
     active: active ?? this.active,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -2204,6 +2284,12 @@ class Part extends DataClass implements Insertable<Part> {
       barcodeType: data.barcodeType.present
           ? data.barcodeType.value
           : this.barcodeType,
+      labelCompanyName: data.labelCompanyName.present
+          ? data.labelCompanyName.value
+          : this.labelCompanyName,
+      labelCompanyAddress: data.labelCompanyAddress.present
+          ? data.labelCompanyAddress.value
+          : this.labelCompanyAddress,
       active: data.active.present ? data.active.value : this.active,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -2220,6 +2306,8 @@ class Part extends DataClass implements Insertable<Part> {
           ..write('defaultDrCode: $defaultDrCode, ')
           ..write('defaultPackQuantity: $defaultPackQuantity, ')
           ..write('barcodeType: $barcodeType, ')
+          ..write('labelCompanyName: $labelCompanyName, ')
+          ..write('labelCompanyAddress: $labelCompanyAddress, ')
           ..write('active: $active, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -2236,6 +2324,8 @@ class Part extends DataClass implements Insertable<Part> {
     defaultDrCode,
     defaultPackQuantity,
     barcodeType,
+    labelCompanyName,
+    labelCompanyAddress,
     active,
     updatedAt,
   );
@@ -2251,6 +2341,8 @@ class Part extends DataClass implements Insertable<Part> {
           other.defaultDrCode == this.defaultDrCode &&
           other.defaultPackQuantity == this.defaultPackQuantity &&
           other.barcodeType == this.barcodeType &&
+          other.labelCompanyName == this.labelCompanyName &&
+          other.labelCompanyAddress == this.labelCompanyAddress &&
           other.active == this.active &&
           other.updatedAt == this.updatedAt);
 }
@@ -2264,6 +2356,8 @@ class PartsCompanion extends UpdateCompanion<Part> {
   final Value<String?> defaultDrCode;
   final Value<int> defaultPackQuantity;
   final Value<String> barcodeType;
+  final Value<String?> labelCompanyName;
+  final Value<String?> labelCompanyAddress;
   final Value<bool> active;
   final Value<DateTime> updatedAt;
   final Value<int> rowid;
@@ -2276,6 +2370,8 @@ class PartsCompanion extends UpdateCompanion<Part> {
     this.defaultDrCode = const Value.absent(),
     this.defaultPackQuantity = const Value.absent(),
     this.barcodeType = const Value.absent(),
+    this.labelCompanyName = const Value.absent(),
+    this.labelCompanyAddress = const Value.absent(),
     this.active = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2289,6 +2385,8 @@ class PartsCompanion extends UpdateCompanion<Part> {
     this.defaultDrCode = const Value.absent(),
     this.defaultPackQuantity = const Value.absent(),
     this.barcodeType = const Value.absent(),
+    this.labelCompanyName = const Value.absent(),
+    this.labelCompanyAddress = const Value.absent(),
     this.active = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -2304,6 +2402,8 @@ class PartsCompanion extends UpdateCompanion<Part> {
     Expression<String>? defaultDrCode,
     Expression<int>? defaultPackQuantity,
     Expression<String>? barcodeType,
+    Expression<String>? labelCompanyName,
+    Expression<String>? labelCompanyAddress,
     Expression<bool>? active,
     Expression<DateTime>? updatedAt,
     Expression<int>? rowid,
@@ -2318,6 +2418,9 @@ class PartsCompanion extends UpdateCompanion<Part> {
       if (defaultPackQuantity != null)
         'default_pack_quantity': defaultPackQuantity,
       if (barcodeType != null) 'barcode_type': barcodeType,
+      if (labelCompanyName != null) 'label_company_name': labelCompanyName,
+      if (labelCompanyAddress != null)
+        'label_company_address': labelCompanyAddress,
       if (active != null) 'active': active,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -2333,6 +2436,8 @@ class PartsCompanion extends UpdateCompanion<Part> {
     Value<String?>? defaultDrCode,
     Value<int>? defaultPackQuantity,
     Value<String>? barcodeType,
+    Value<String?>? labelCompanyName,
+    Value<String?>? labelCompanyAddress,
     Value<bool>? active,
     Value<DateTime>? updatedAt,
     Value<int>? rowid,
@@ -2346,6 +2451,8 @@ class PartsCompanion extends UpdateCompanion<Part> {
       defaultDrCode: defaultDrCode ?? this.defaultDrCode,
       defaultPackQuantity: defaultPackQuantity ?? this.defaultPackQuantity,
       barcodeType: barcodeType ?? this.barcodeType,
+      labelCompanyName: labelCompanyName ?? this.labelCompanyName,
+      labelCompanyAddress: labelCompanyAddress ?? this.labelCompanyAddress,
       active: active ?? this.active,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -2379,6 +2486,14 @@ class PartsCompanion extends UpdateCompanion<Part> {
     if (barcodeType.present) {
       map['barcode_type'] = Variable<String>(barcodeType.value);
     }
+    if (labelCompanyName.present) {
+      map['label_company_name'] = Variable<String>(labelCompanyName.value);
+    }
+    if (labelCompanyAddress.present) {
+      map['label_company_address'] = Variable<String>(
+        labelCompanyAddress.value,
+      );
+    }
     if (active.present) {
       map['active'] = Variable<bool>(active.value);
     }
@@ -2402,6 +2517,8 @@ class PartsCompanion extends UpdateCompanion<Part> {
           ..write('defaultDrCode: $defaultDrCode, ')
           ..write('defaultPackQuantity: $defaultPackQuantity, ')
           ..write('barcodeType: $barcodeType, ')
+          ..write('labelCompanyName: $labelCompanyName, ')
+          ..write('labelCompanyAddress: $labelCompanyAddress, ')
           ..write('active: $active, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -8961,6 +9078,8 @@ typedef $$PartsTableCreateCompanionBuilder =
       Value<String?> defaultDrCode,
       Value<int> defaultPackQuantity,
       Value<String> barcodeType,
+      Value<String?> labelCompanyName,
+      Value<String?> labelCompanyAddress,
       Value<bool> active,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -8975,6 +9094,8 @@ typedef $$PartsTableUpdateCompanionBuilder =
       Value<String?> defaultDrCode,
       Value<int> defaultPackQuantity,
       Value<String> barcodeType,
+      Value<String?> labelCompanyName,
+      Value<String?> labelCompanyAddress,
       Value<bool> active,
       Value<DateTime> updatedAt,
       Value<int> rowid,
@@ -9043,6 +9164,16 @@ class $$PartsTableFilterComposer
 
   ColumnFilters<String> get barcodeType => $composableBuilder(
     column: $table.barcodeType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get labelCompanyName => $composableBuilder(
+    column: $table.labelCompanyName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get labelCompanyAddress => $composableBuilder(
+    column: $table.labelCompanyAddress,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9124,6 +9255,16 @@ class $$PartsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get labelCompanyName => $composableBuilder(
+    column: $table.labelCompanyName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get labelCompanyAddress => $composableBuilder(
+    column: $table.labelCompanyAddress,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get active => $composableBuilder(
     column: $table.active,
     builder: (column) => ColumnOrderings(column),
@@ -9196,6 +9337,16 @@ class $$PartsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<String> get labelCompanyName => $composableBuilder(
+    column: $table.labelCompanyName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get labelCompanyAddress => $composableBuilder(
+    column: $table.labelCompanyAddress,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<bool> get active =>
       $composableBuilder(column: $table.active, builder: (column) => column);
 
@@ -9262,6 +9413,8 @@ class $$PartsTableTableManager
                 Value<String?> defaultDrCode = const Value.absent(),
                 Value<int> defaultPackQuantity = const Value.absent(),
                 Value<String> barcodeType = const Value.absent(),
+                Value<String?> labelCompanyName = const Value.absent(),
+                Value<String?> labelCompanyAddress = const Value.absent(),
                 Value<bool> active = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -9274,6 +9427,8 @@ class $$PartsTableTableManager
                 defaultDrCode: defaultDrCode,
                 defaultPackQuantity: defaultPackQuantity,
                 barcodeType: barcodeType,
+                labelCompanyName: labelCompanyName,
+                labelCompanyAddress: labelCompanyAddress,
                 active: active,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -9288,6 +9443,8 @@ class $$PartsTableTableManager
                 Value<String?> defaultDrCode = const Value.absent(),
                 Value<int> defaultPackQuantity = const Value.absent(),
                 Value<String> barcodeType = const Value.absent(),
+                Value<String?> labelCompanyName = const Value.absent(),
+                Value<String?> labelCompanyAddress = const Value.absent(),
                 Value<bool> active = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -9300,6 +9457,8 @@ class $$PartsTableTableManager
                 defaultDrCode: defaultDrCode,
                 defaultPackQuantity: defaultPackQuantity,
                 barcodeType: barcodeType,
+                labelCompanyName: labelCompanyName,
+                labelCompanyAddress: labelCompanyAddress,
                 active: active,
                 updatedAt: updatedAt,
                 rowid: rowid,

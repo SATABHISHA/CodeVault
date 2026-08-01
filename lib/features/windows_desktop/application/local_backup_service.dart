@@ -57,7 +57,7 @@ class LocalBackupService {
     final manifest = BackupManifest(
       companyId: companyId,
       ownerUserId: ownerUserId,
-      schemaVersion: 1,
+      schemaVersion: 2,
       createdAt: DateTime.now(),
       databaseSha256: checksum,
     );
@@ -143,8 +143,22 @@ class LocalBackupService {
       await target.transaction(() async {
         for (final table in tables) {
           final before = await _count(target, table);
+          final targetColumns = await _columns(target, table);
+          final importedColumns = await _columns(
+            target,
+            table,
+            schema: 'imported',
+          );
+          final sharedColumns = targetColumns
+              .where(importedColumns.contains)
+              .toList();
+          if (sharedColumns.isEmpty) continue;
+          final columns = sharedColumns
+              .map((column) => '"${column.replaceAll('"', '""')}"')
+              .join(', ');
           await target.customStatement(
-            'INSERT OR IGNORE INTO $table SELECT * FROM imported.$table',
+            'INSERT OR IGNORE INTO $table ($columns) '
+            'SELECT $columns FROM imported.$table',
           );
           report[table] = await _count(target, table) - before;
         }
@@ -166,6 +180,17 @@ class LocalBackupService {
         .customSelect('SELECT COUNT(*) AS total FROM $table')
         .getSingle();
     return result.read<int>('total');
+  }
+
+  Future<List<String>> _columns(
+    LocalDatabase database,
+    String table, {
+    String schema = 'main',
+  }) async {
+    final rows = await database
+        .customSelect("PRAGMA $schema.table_info('$table')")
+        .get();
+    return rows.map((row) => row.read<String>('name')).toList();
   }
 
   Future<File> replace({

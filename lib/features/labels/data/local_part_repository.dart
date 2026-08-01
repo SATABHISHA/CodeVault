@@ -21,6 +21,8 @@ class LocalPartRepository implements PartRepository {
     packQuantity: row.defaultPackQuantity,
     barcodeType: row.barcodeType,
     version: 1,
+    labelCompanyName: row.labelCompanyName ?? '',
+    labelCompanyAddress: row.labelCompanyAddress ?? '',
   );
 
   // ── interface ─────────────────────────────────────────────────────────────
@@ -56,6 +58,10 @@ class LocalPartRepository implements PartRepository {
               data['default_pack_quantity'] as int? ?? 1,
             ),
             barcodeType: Value(data['barcode_type'] as String? ?? 'code128'),
+            labelCompanyName: Value(data['label_company_name'] as String?),
+            labelCompanyAddress: Value(
+              data['label_company_address'] as String?,
+            ),
             active: const Value(true),
           ),
         );
@@ -86,6 +92,10 @@ class LocalPartRepository implements PartRepository {
                 ),
                 barcodeType: Value(
                   data['barcode_type'] as String? ?? part.barcodeType,
+                ),
+                labelCompanyName: Value(data['label_company_name'] as String?),
+                labelCompanyAddress: Value(
+                  data['label_company_address'] as String?,
                 ),
                 updatedAt: Value(DateTime.now()),
               ),

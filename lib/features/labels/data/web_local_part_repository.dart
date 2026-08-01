@@ -28,6 +28,8 @@ class WebLocalPartRepository implements PartRepository {
       packQuantity: payload['default_pack_quantity'] as int? ?? 1,
       barcodeType: payload['barcode_type'] as String? ?? 'code128',
       version: row.serverVersion,
+      labelCompanyName: payload['label_company_name'] as String? ?? '',
+      labelCompanyAddress: payload['label_company_address'] as String? ?? '',
     );
   }
 
@@ -69,6 +71,8 @@ class WebLocalPartRepository implements PartRepository {
       'default_dr_code': data['default_dr_code'],
       'default_pack_quantity': data['default_pack_quantity'],
       'barcode_type': data['barcode_type'],
+      'label_company_name': data['label_company_name'],
+      'label_company_address': data['label_company_address'],
     };
 
     final db = _db(tenantId);
@@ -122,6 +126,12 @@ class WebLocalPartRepository implements PartRepository {
     }
     if (data.containsKey('barcode_type')) {
       payload['barcode_type'] = data['barcode_type'];
+    }
+    if (data.containsKey('label_company_name')) {
+      payload['label_company_name'] = data['label_company_name'];
+    }
+    if (data.containsKey('label_company_address')) {
+      payload['label_company_address'] = data['label_company_address'];
     }
 
     final changed =

@@ -62,8 +62,11 @@ class Parts extends Table {
   TextColumn get model => text().nullable()();
   TextColumn get description => text().nullable()();
   TextColumn get defaultDrCode => text().nullable()();
-  IntColumn get defaultPackQuantity => integer().withDefault(const Constant(1))();
+  IntColumn get defaultPackQuantity =>
+      integer().withDefault(const Constant(1))();
   TextColumn get barcodeType => text().withDefault(const Constant('code128'))();
+  TextColumn get labelCompanyName => text().nullable()();
+  TextColumn get labelCompanyAddress => text().nullable()();
   BoolColumn get active => boolean().withDefault(const Constant(true))();
   DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
   @override
@@ -201,13 +204,19 @@ class LocalDatabase extends _$LocalDatabase {
   LocalDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (migrator) async {
       await migrator.createAll();
       await customStatement('PRAGMA foreign_keys = ON');
+    },
+    onUpgrade: (migrator, from, to) async {
+      if (from < 2) {
+        await migrator.addColumn(parts, parts.labelCompanyName);
+        await migrator.addColumn(parts, parts.labelCompanyAddress);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');

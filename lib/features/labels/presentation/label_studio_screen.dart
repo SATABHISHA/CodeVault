@@ -1222,6 +1222,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     'default_dr_code': dr.text.trim().isEmpty ? null : dr.text.trim(),
     'default_pack_quantity': int.tryParse(pack.text) ?? 1,
     'barcode_type': symbology,
+    'label_company_name': companyName.text.trim(),
+    'label_company_address': companyAddress.text.trim(),
     'is_active': true,
   };
 
@@ -1266,6 +1268,12 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     partNumber.text = part.number;
     itemName.text = part.name;
     model.text = part.model;
+    companyName.text = part.labelCompanyName.isEmpty
+        ? WindowsSession.companyName
+        : part.labelCompanyName;
+    companyAddress.text = part.labelCompanyAddress.isEmpty
+        ? WindowsSession.companyAddress
+        : part.labelCompanyAddress;
     dr.text = part.drCode;
     pack.text = part.packQuantity.toString();
     symbology = ['qr', 'data_matrix', 'code128'].contains(part.barcodeType)
@@ -1436,6 +1444,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     dr.text = 'NR';
     pack.text = '1';
     quantity.text = '1';
+    companyName.text = WindowsSession.companyName;
+    companyAddress.text = WindowsSession.companyAddress;
     if (autoDateTime) {
       _stampNow();
     }
