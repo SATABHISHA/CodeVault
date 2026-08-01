@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'dart:math' as math;
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -82,7 +83,10 @@ class BrowserPdfGenerator {
 
     final innerW = wPt - pad * 2;
     final innerH = hPt - pad * 2;
-    final twinSide = (innerH * 0.50).clamp(innerH * 0.44, innerW * 0.20);
+    // Narrow labels (for example 38 x 25 mm) can have less horizontal room
+    // than the preferred QR height. Pick the smaller physical constraint
+    // directly; using clamp here can produce lowerLimit > upperLimit.
+    final twinSide = math.max(8.0, math.min(innerH * 0.50, innerW * 0.20));
     final centerW = (innerW - (twinSide * 2) - (gap * 2)).clamp(10.0, innerW);
 
     // ── Estimate text block height ───────────────────────────────────────────

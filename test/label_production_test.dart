@@ -22,6 +22,33 @@ void main() {
     }
   });
 
+  test('dual-code PDF supports every configured label size', () async {
+    for (final size in [
+      (38.0, 25.0),
+      (80.0, 16.0),
+      (100.0, 30.0),
+      (60.0, 150.0),
+    ]) {
+      final bytes = await const BrowserPdfGenerator().generate(
+        BrowserLabelDocument(
+          title: 'PART NO: P-1',
+          content: '00P1NRE026080000001',
+          widthMm: size.$1,
+          heightMm: size.$2,
+          symbology: 'data_matrix',
+          company: 'SS ENTERPRISE',
+          model: 'M26',
+          partNumber: 'P-1',
+          port: 'PORT 1',
+          dateText: '01-08-2026',
+          timeText: '13:55:40',
+          dualSideCodes: true,
+        ),
+      );
+      expect(bytes.take(4), equals('%PDF'.codeUnits), reason: '$size');
+    }
+  });
+
   testWidgets('live code preview paints every supported symbology', (
     tester,
   ) async {

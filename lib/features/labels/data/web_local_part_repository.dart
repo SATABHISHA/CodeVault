@@ -38,27 +38,26 @@ class WebLocalPartRepository implements PartRepository {
       ..where((t) => t.tenantId.equals(tenantId) & t.deleted.equals(false));
 
     final rows = await query.get();
-    
+
     // In-memory search since data is in JSON blob
     if (search.isNotEmpty) {
       final s = search.toLowerCase();
       return rows
           .map(_fromRow)
-          .where((part) =>
-              part.name.toLowerCase().contains(s) ||
-              part.number.toLowerCase().contains(s) ||
-              part.model.toLowerCase().contains(s))
+          .where(
+            (part) =>
+                part.name.toLowerCase().contains(s) ||
+                part.number.toLowerCase().contains(s) ||
+                part.model.toLowerCase().contains(s),
+          )
           .toList();
     }
-    
+
     return rows.map(_fromRow).toList();
   }
 
   @override
-  Future<PartRecord> create(
-    String tenantId,
-    Map<String, dynamic> data,
-  ) async {
+  Future<PartRecord> create(String tenantId, Map<String, dynamic> data) async {
     const uuid = Uuid();
     final id = uuid.v4();
     final payload = {
@@ -71,22 +70,24 @@ class WebLocalPartRepository implements PartRepository {
       'default_pack_quantity': data['default_pack_quantity'],
       'barcode_type': data['barcode_type'],
     };
-    
+
     final db = _db(tenantId);
-    await db.into(db.cachedParts).insert(
-      CachedPartsCompanion.insert(
-        id: id,
-        tenantId: tenantId,
-        payloadJson: jsonEncode(payload),
-        serverVersion: 1,
-        deleted: const Value(false),
-        updatedAt: DateTime.now(),
-      ),
-    );
-    
-    final row = await (db.select(db.cachedParts)
-          ..where((t) => t.tenantId.equals(tenantId) & t.id.equals(id)))
-        .getSingle();
+    await db
+        .into(db.cachedParts)
+        .insert(
+          CachedPartsCompanion.insert(
+            id: id,
+            tenantId: tenantId,
+            payloadJson: jsonEncode(payload),
+            serverVersion: 1,
+            deleted: const Value(false),
+            updatedAt: DateTime.now(),
+          ),
+        );
+
+    final row = await (db.select(
+      db.cachedParts,
+    )..where((t) => t.tenantId.equals(tenantId) & t.id.equals(id))).getSingle();
     return _fromRow(row);
   }
 
@@ -97,39 +98,60 @@ class WebLocalPartRepository implements PartRepository {
     Map<String, dynamic> data,
   ) async {
     final db = _db(tenantId);
-    final existing = await (db.select(db.cachedParts)
-          ..where((t) => t.tenantId.equals(tenantId) & t.id.equals(part.id)))
-        .getSingle();
-        
-    final payload = jsonDecode(existing.payloadJson) as Map<String, dynamic>;
-    if (data.containsKey('part_number')) payload['part_number'] = data['part_number'];
-    if (data.containsKey('item_name')) payload['item_name'] = data['item_name'];
-    if (data.containsKey('item_model')) payload['item_model'] = data['item_model'];
-    if (data.containsKey('default_dr_code')) payload['default_dr_code'] = data['default_dr_code'];
-    if (data.containsKey('default_pack_quantity')) payload['default_pack_quantity'] = data['default_pack_quantity'];
-    if (data.containsKey('barcode_type')) payload['barcode_type'] = data['barcode_type'];
+    final existing =
+        await (db.select(
+              db.cachedParts,
+            )..where((t) => t.tenantId.equals(tenantId) & t.id.equals(part.id)))
+            .getSingle();
 
-    await (db.update(db.cachedParts)
-          ..where((t) => t.tenantId.equals(tenantId) & t.id.equals(part.id)))
-        .write(
-      CachedPartsCompanion(
-        payloadJson: Value(jsonEncode(payload)),
-        updatedAt: Value(DateTime.now()),
-      ),
-    );
-    
-    final row = await (db.select(db.cachedParts)
-          ..where((t) => t.tenantId.equals(tenantId) & t.id.equals(part.id)))
-        .getSingle();
+    final payload = jsonDecode(existing.payloadJson) as Map<String, dynamic>;
+    if (data.containsKey('part_number')) {
+      payload['part_number'] = data['part_number'];
+    }
+    if (data.containsKey('item_name')) {
+      payload['item_name'] = data['item_name'];
+    }
+    if (data.containsKey('item_model')) {
+      payload['item_model'] = data['item_model'];
+    }
+    if (data.containsKey('default_dr_code')) {
+      payload['default_dr_code'] = data['default_dr_code'];
+    }
+    if (data.containsKey('default_pack_quantity')) {
+      payload['default_pack_quantity'] = data['default_pack_quantity'];
+    }
+    if (data.containsKey('barcode_type')) {
+      payload['barcode_type'] = data['barcode_type'];
+    }
+
+    final changed =
+        await (db.update(
+              db.cachedParts,
+            )..where((t) => t.tenantId.equals(tenantId) & t.id.equals(part.id)))
+            .write(
+              CachedPartsCompanion(
+                payloadJson: Value(jsonEncode(payload)),
+                updatedAt: Value(DateTime.now()),
+              ),
+            );
+    if (changed != 1) {
+      throw StateError('The selected part no longer exists in this company.');
+    }
+
+    final row =
+        await (db.select(
+              db.cachedParts,
+            )..where((t) => t.tenantId.equals(tenantId) & t.id.equals(part.id)))
+            .getSingle();
     return _fromRow(row);
   }
 
   @override
   Future<void> delete(String tenantId, String id) async {
     final db = _db(tenantId);
-    await (db.update(db.cachedParts)
-          ..where((t) => t.tenantId.equals(tenantId) & t.id.equals(id)))
-        .write(
+    await (db.update(
+      db.cachedParts,
+    )..where((t) => t.tenantId.equals(tenantId) & t.id.equals(id))).write(
       CachedPartsCompanion(
         deleted: const Value(true),
         updatedAt: Value(DateTime.now()),

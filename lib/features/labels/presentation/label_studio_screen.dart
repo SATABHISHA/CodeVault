@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -616,239 +617,306 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       icon: Icons.center_focus_strong,
       child: Column(
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOutCubic,
-            width: double.infinity,
-            constraints: const BoxConstraints(minHeight: 260),
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x22000000),
-                  blurRadius: 18,
-                  offset: Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (dualSideCodes && codeSymbology != CodeSymbology.code128)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 104,
-                              height: 104,
-                              child: BarcodeView(
-                                data: codeData,
-                                symbology: codeSymbology,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  // Company — centered
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final ratio = profile.$1 / profile.$2;
+              final previewWidth = math.min(
+                constraints.maxWidth,
+                520.0 * ratio,
+              );
+              return Align(
+                alignment: Alignment.topCenter,
+                child: SizedBox(
+                  width: previewWidth,
+                  child: AspectRatio(
+                    aspectRatio: ratio,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x22000000),
+                            blurRadius: 18,
+                            offset: Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, labelConstraints) {
+                          final qrSide = math.min(
+                            labelConstraints.maxHeight * .52,
+                            labelConstraints.maxWidth * .20,
+                          );
+                          return Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                if (dualSideCodes &&
+                                    codeSymbology != CodeSymbology.code128)
+                                  Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          SizedBox(
+                                            width: qrSide,
+                                            height: qrSide,
+                                            child: BarcodeView(
+                                              data: codeData,
+                                              symbology: codeSymbology,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.stretch,
+                                              children: [
+                                                // Company — centered
+                                                Text(
+                                                  companyName.text
+                                                          .trim()
+                                                          .isEmpty
+                                                      ? 'COMPANY NAME'
+                                                      : companyName.text
+                                                            .trim()
+                                                            .toUpperCase(),
+                                                  textAlign: TextAlign.center,
+                                                  style: const TextStyle(
+                                                    color: Colors.black,
+                                                    fontFamily: LabelTypography
+                                                        .fontFamily,
+                                                    fontWeight: FontWeight.w900,
+                                                    fontSize: 13,
+                                                    letterSpacing:
+                                                        LabelTypography
+                                                            .companyTracking,
+                                                    height: 1.05,
+                                                  ),
+                                                ),
+                                                // MODEL left  ·  PORT right
+                                                Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
+                                                  children: [
+                                                    Text(
+                                                      'MODEL: ${model.text.trim().isEmpty ? '-' : model.text.trim().toUpperCase()}',
+                                                      style: const TextStyle(
+                                                        color: Colors.black,
+                                                        fontFamily:
+                                                            LabelTypography
+                                                                .fontFamily,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 10,
+                                                        letterSpacing:
+                                                            LabelTypography
+                                                                .textTracking,
+                                                        height: 1.15,
+                                                      ),
+                                                    ),
+                                                    if (portLabel.text
+                                                        .trim()
+                                                        .isNotEmpty)
+                                                      Text(
+                                                        portLabel.text
+                                                            .trim()
+                                                            .toUpperCase(),
+                                                        style: const TextStyle(
+                                                          color: Colors.black,
+                                                          fontFamily:
+                                                              LabelTypography
+                                                                  .fontFamily,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 10,
+                                                          letterSpacing:
+                                                              LabelTypography
+                                                                  .textTracking,
+                                                          height: 1.15,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                                // DATE + TIME — left
+                                                Text(
+                                                  'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}    TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
+                                                  textAlign: TextAlign.left,
+                                                  style: const TextStyle(
+                                                    color: Colors.black,
+                                                    fontFamily: LabelTypography
+                                                        .fontFamily,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 10,
+                                                    letterSpacing:
+                                                        LabelTypography
+                                                            .textTracking,
+                                                    height: 1.15,
+                                                  ),
+                                                ),
+                                                // PART NO — left, bold
+                                                Text(
+                                                  'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
+                                                  textAlign: TextAlign.left,
+                                                  style: const TextStyle(
+                                                    color: Colors.black,
+                                                    fontFamily: LabelTypography
+                                                        .fontFamily,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 12,
+                                                    letterSpacing:
+                                                        LabelTypography
+                                                            .textTracking,
+                                                    height: 1.1,
+                                                  ),
+                                                ),
+                                                if (includeName)
+                                                  Text(
+                                                    itemName.text.isEmpty
+                                                        ? '—'
+                                                        : itemName.text,
+                                                    textAlign: TextAlign.left,
+                                                    style: const TextStyle(
+                                                      color: Colors.black,
+                                                      fontFamily:
+                                                          LabelTypography
+                                                              .fontFamily,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 10,
+                                                      letterSpacing:
+                                                          LabelTypography
+                                                              .textTracking,
+                                                      height: 1.15,
+                                                    ),
+                                                  ),
+                                                Text(
+                                                  codeData,
+                                                  maxLines: 1,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                  style: const TextStyle(
+                                                    color: Colors.black,
+                                                    fontFamily: LabelTypography
+                                                        .fontFamily,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 10,
+                                                    letterSpacing:
+                                                        LabelTypography
+                                                            .textTracking,
+                                                    height: 1.15,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          SizedBox(
+                                            width: qrSide,
+                                            height: qrSide,
+                                            child: BarcodeView(
+                                              data: codeData,
+                                              symbology: codeSymbology,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  )
+                                else ...[
                                   Text(
                                     companyName.text.trim().isEmpty
                                         ? 'COMPANY NAME'
                                         : companyName.text.trim().toUpperCase(),
-                                    textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       color: Colors.black,
-                                      fontFamily: LabelTypography.fontFamily,
                                       fontWeight: FontWeight.w900,
-                                      fontSize: 13,
-                                      letterSpacing:
-                                          LabelTypography.companyTracking,
-                                      height: 1.05,
+                                      fontSize: 15,
                                     ),
                                   ),
-                                  // MODEL left  ·  PORT right
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'MODEL: ${model.text.trim().isEmpty ? '-' : model.text.trim().toUpperCase()}',
-                                        style: const TextStyle(
-                                          color: Colors.black,
-                                          fontFamily:
-                                              LabelTypography.fontFamily,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 10,
-                                          letterSpacing:
-                                              LabelTypography.textTracking,
-                                          height: 1.15,
-                                        ),
-                                      ),
-                                      if (portLabel.text.trim().isNotEmpty)
-                                        Text(
-                                          portLabel.text.trim().toUpperCase(),
-                                          style: const TextStyle(
-                                            color: Colors.black,
-                                            fontFamily:
-                                                LabelTypography.fontFamily,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 10,
-                                            letterSpacing:
-                                                LabelTypography.textTracking,
-                                            height: 1.15,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  // DATE + TIME — left
                                   Text(
-                                    'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}    TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
-                                    textAlign: TextAlign.left,
+                                    companyAddress.text.trim().isEmpty
+                                        ? 'COMPANY ADDRESS'
+                                        : companyAddress.text
+                                              .trim()
+                                              .toUpperCase(),
                                     style: const TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: LabelTypography.fontFamily,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 10,
-                                      letterSpacing:
-                                          LabelTypography.textTracking,
-                                      height: 1.15,
+                                      color: Colors.black54,
+                                      fontSize: 9,
                                     ),
                                   ),
-                                  // PART NO — left, bold
+                                  const SizedBox(height: 12),
                                   Text(
                                     'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
-                                    textAlign: TextAlign.left,
                                     style: const TextStyle(
                                       color: Colors.black,
-                                      fontFamily: LabelTypography.fontFamily,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 12,
-                                      letterSpacing:
-                                          LabelTypography.textTracking,
-                                      height: 1.1,
+                                      fontWeight: FontWeight.w800,
                                     ),
                                   ),
                                   if (includeName)
                                     Text(
-                                      itemName.text.isEmpty
-                                          ? '—'
-                                          : itemName.text,
-                                      textAlign: TextAlign.left,
+                                      'ITEM: ${itemName.text.isEmpty ? '—' : itemName.text}',
                                       style: const TextStyle(
                                         color: Colors.black,
-                                        fontFamily: LabelTypography.fontFamily,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 10,
-                                        letterSpacing:
-                                            LabelTypography.textTracking,
-                                        height: 1.15,
                                       ),
                                     ),
+                                  Text(
+                                    portValue.isEmpty
+                                        ? 'MODEL: ${model.text.isEmpty ? '—' : model.text}'
+                                        : 'MODEL: ${model.text.isEmpty ? '—' : model.text}   ${portLabel.text.trim()}',
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                  Text(
+                                    'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}   TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  SizedBox(
+                                    height: 105,
+                                    width: double.infinity,
+                                    child: BarcodeView(
+                                      data: codeData,
+                                      symbology: codeSymbology,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
                                   Text(
                                     codeData,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       color: Colors.black,
-                                      fontFamily: LabelTypography.fontFamily,
-                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'monospace',
                                       fontSize: 10,
-                                      letterSpacing:
-                                          LabelTypography.textTracking,
-                                      height: 1.15,
                                     ),
                                   ),
                                 ],
-                              ),
+                              ],
                             ),
-                            const SizedBox(width: 10),
-                            SizedBox(
-                              width: 104,
-                              height: 104,
-                              child: BarcodeView(
-                                data: codeData,
-                                symbology: codeSymbology,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    )
-                  else ...[
-                    Text(
-                      companyName.text.trim().isEmpty
-                          ? 'COMPANY NAME'
-                          : companyName.text.trim().toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 15,
+                          );
+                        },
                       ),
                     ),
-                    Text(
-                      companyAddress.text.trim().isEmpty
-                          ? 'COMPANY ADDRESS'
-                          : companyAddress.text.trim().toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.black54,
-                        fontSize: 9,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (includeName)
-                      Text(
-                        'ITEM: ${itemName.text.isEmpty ? '—' : itemName.text}',
-                        style: const TextStyle(color: Colors.black),
-                      ),
-                    Text(
-                      portValue.isEmpty
-                          ? 'MODEL: ${model.text.isEmpty ? '—' : model.text}'
-                          : 'MODEL: ${model.text.isEmpty ? '—' : model.text}   ${portLabel.text.trim()}',
-                      style: const TextStyle(color: Colors.black, fontSize: 11),
-                    ),
-                    Text(
-                      'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}   TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
-                      style: const TextStyle(color: Colors.black, fontSize: 10),
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      height: 105,
-                      width: double.infinity,
-                      child: BarcodeView(
-                        data: codeData,
-                        symbology: codeSymbology,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      codeData,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontFamily: 'monospace',
-                        fontSize: 10,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 14),
           Text(
@@ -1041,8 +1109,15 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     }
     setState(() => busy = true);
     try {
-      selected = await action(tenant);
+      final changed = await action(tenant);
       await _load();
+      final persisted = parts
+          .where((part) => part.id == changed.id)
+          .firstOrNull;
+      if (persisted == null) {
+        throw StateError('The updated part could not be reloaded.');
+      }
+      _select(persisted);
       _notice(success);
     } catch (error) {
       _notice(_error(error));
