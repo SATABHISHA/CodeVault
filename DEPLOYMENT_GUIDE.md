@@ -32,6 +32,45 @@ The entire process is automated via **GitHub Actions**.
 
 ---
 
+## Current Hostinger Workflow (Manual Git-Based Deploy)
+
+This repository also supports a direct deployment flow for the Hostinger server using the `web-production` branch.
+
+### One-time server setup
+- Create the SSH key pair locally and add the public key to the Hostinger account.
+- Add an SSH config alias named `hostinger-codevault` for the server.
+- Clone the `web-production` branch into the public HTML folder:
+
+```bash
+ssh hostinger-codevault "cd ~/domains/scanhub.sroy.es/public_html && git clone --single-branch --branch web-production https://github.com/SATABHISHA/CodeVault.git ."
+```
+
+### Local deployment commands
+From the repository root on your machine, run:
+
+```powershell
+./scripts/deploy_web.ps1
+```
+
+That script will:
+- build the Flutter web app in release mode,
+- update the `web-production` branch with the generated files,
+- push the latest build to GitHub.
+
+Then publish the update on the Hostinger server:
+
+```powershell
+ssh hostinger-codevault "cd ~/domains/scanhub.sroy.es/public_html && git pull"
+```
+
+You can run both steps in one command:
+
+```powershell
+./scripts/deploy_web.ps1; ssh hostinger-codevault "cd ~/domains/scanhub.sroy.es/public_html && git pull"
+```
+
+---
+
 ## Troubleshooting
 
 ### What if the deployment fails?
