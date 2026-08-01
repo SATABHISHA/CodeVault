@@ -1,3 +1,4 @@
+import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -114,7 +115,11 @@ class _WindowsDashboardScreenState extends State<WindowsDashboardScreen> {
                       backgroundColor: Colors.white,
                       foregroundColor: const Color(0xFF6038E8),
                     ),
-                    onPressed: () => context.go('/windows/operations'),
+                    onPressed: () => context.go(
+                      PlatformCapabilities.current().isWindows
+                          ? '/windows/operations'
+                          : '/studio',
+                    ),
                     icon: const Icon(Icons.add_circle_outline),
                     label: const Text('Create label'),
                   ),
@@ -199,7 +204,9 @@ class _WindowsDashboardScreenState extends State<WindowsDashboardScreen> {
                 'Create industrial label',
                 'Barcode, QR and Data Matrix',
                 Icons.qr_code_2,
-                '/windows/operations',
+                PlatformCapabilities.current().isWindows
+                    ? '/windows/operations'
+                    : '/studio',
                 const Color(0xFF6747F5),
               ),
               _action(

@@ -48,7 +48,10 @@ final appRouterProvider = Provider<GoRouter>(
       if (!isAuth && !authRoutes.contains(path)) return '/login';
 
       // Non-Windows must not enter Windows setup/admin routes.
-      if (isAuth && path.startsWith('/windows')) return '/dashboard';
+      if (isAuth && path == '/windows/operations') return '/studio';
+      if (isAuth && path.startsWith('/windows')) {
+        return path == '/windows' ? '/dashboard' : '/studio';
+      }
 
       if (isAuth && authRoutes.contains(path) && path != '/splash') {
         return '/dashboard';
@@ -100,6 +103,10 @@ final appRouterProvider = Provider<GoRouter>(
           ),
           GoRoute(
             path: '/windows/operations',
+            redirect: (context, state) {
+              if (!PlatformCapabilities.current().isWindows) return '/studio';
+              return null;
+            },
             builder: (context, state) => const LabelStudioScreen(),
           ),
           GoRoute(

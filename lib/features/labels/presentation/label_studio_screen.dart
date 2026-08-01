@@ -49,6 +49,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   final dr = TextEditingController(text: 'NR');
   final pack = TextEditingController(text: '1');
   final quantity = TextEditingController(text: '1');
+  final portLabel = TextEditingController(text: 'PORT 1');
+  final labelDate = TextEditingController();
+  final labelTime = TextEditingController();
   final companyName = TextEditingController();
   final companyAddress = TextEditingController();
   List<PartRecord> parts = const [];
@@ -57,6 +60,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   bool busy = false;
   bool includeName = true;
   bool includeBorder = true;
+  bool dualSideCodes = true;
+  bool autoDateTime = true;
   String symbology = 'data_matrix';
   String labelSize = '100 × 30 mm';
   int stickersPerRow = 1; // will be set to maxStickersPerRow in initState
@@ -81,6 +86,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     super.initState();
     companyName.text = WindowsSession.companyName;
     companyAddress.text = WindowsSession.companyAddress;
+    _stampNow();
     search.addListener(_searchChanged);
     for (final controller in [
       partNumber,
@@ -89,6 +95,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       serial,
       dr,
       pack,
+      portLabel,
+      labelDate,
+      labelTime,
       companyName,
       companyAddress,
     ]) {
@@ -142,6 +151,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       dr,
       pack,
       quantity,
+      portLabel,
+      labelDate,
+      labelTime,
       companyName,
       companyAddress,
     ]) {
@@ -159,6 +171,16 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     final month = now.month.toString().padLeft(2, '0');
     final year = (now.year % 100).toString().padLeft(2, '0');
     return '00${partNumber.text}${dr.text}E$year$month${serial.text.padLeft(7, '0')}';
+  }
+
+  String _twoDigits(int value) => value.toString().padLeft(2, '0');
+
+  void _stampNow() {
+    final now = DateTime.now();
+    labelDate.text =
+        '${_twoDigits(now.day)}-${_twoDigits(now.month)}-${now.year}';
+    labelTime.text =
+        '${_twoDigits(now.hour)}:${_twoDigits(now.minute)}:${_twoDigits(now.second)}';
   }
 
   CodeSymbology get codeSymbology => switch (symbology) {
@@ -376,6 +398,36 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
           ],
         ),
         const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _field(
+                portLabel,
+                'Port label text (e.g. PORT 1)',
+                Icons.settings_ethernet,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _field(
+                labelDate,
+                'Label date (DD-MM-YYYY)',
+                Icons.calendar_today,
+                enabled: !autoDateTime,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _field(
+                labelTime,
+                'Label time (HH:MM:SS)',
+                Icons.schedule,
+                enabled: !autoDateTime,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         _dropdown(
           'Label profile',
           labelSize,
@@ -401,6 +453,39 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
           'qr',
           'data_matrix',
         ], (value) => setState(() => symbology = value)),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Dual left-right code layout'),
+          subtitle: const Text('Print the same code on left and right like the reference sticker'),
+          value: dualSideCodes,
+          onChanged: (value) {
+            setState(() {
+              dualSideCodes = value;
+              if (value && symbology == 'code128') {
+                symbology = 'qr';
+              }
+            });
+          },
+        ),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Auto-fill date and time'),
+          subtitle: const Text('Uses current timestamp at PDF generation and printing'),
+          value: autoDateTime,
+          onChanged: (value) {
+            setState(() => autoDateTime = value);
+            if (value) {
+              _stampNow();
+            }
+          },
+          secondary: IconButton(
+            tooltip: 'Refresh timestamp now',
+            onPressed: () {
+              setState(_stampNow);
+            },
+            icon: const Icon(Icons.refresh),
+          ),
+        ),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
           title: const Text('Include item name'),
@@ -533,56 +618,154 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  companyName.text.trim().isEmpty
-                      ? 'COMPANY NAME'
-                      : companyName.text.trim().toUpperCase(),
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 15,
-                  ),
-                ),
-                Text(
-                  companyAddress.text.trim().isEmpty
-                      ? 'COMPANY ADDRESS'
-                      : companyAddress.text.trim().toUpperCase(),
-                  style: const TextStyle(color: Colors.black54, fontSize: 9),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                if (includeName)
+                if (dualSideCodes && codeSymbology != CodeSymbology.code128)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            width: 72,
+                            height: 72,
+                            child: BarcodeView(
+                              data: codeData,
+                              symbology: codeSymbology,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Text(
+                                  companyName.text.trim().isEmpty
+                                      ? 'COMPANY NAME'
+                                      : companyName.text.trim().toUpperCase(),
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                Text(
+                                  'MODEL: ${model.text.isEmpty ? '-' : model.text.toUpperCase()}    ${portLabel.text.trim().isEmpty ? 'PORT -' : portLabel.text.trim().toUpperCase()}',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                                Text(
+                                  'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}    TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                                Text(
+                                  'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                if (includeName)
+                                  Text(
+                                    itemName.text.isEmpty ? '—' : itemName.text,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          SizedBox(
+                            width: 72,
+                            height: 72,
+                            child: BarcodeView(
+                              data: codeData,
+                              symbology: codeSymbology,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        codeData,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.black,
+                          fontFamily: 'monospace',
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  )
+                else ...[
                   Text(
-                    'ITEM: ${itemName.text.isEmpty ? '—' : itemName.text}',
-                    style: const TextStyle(color: Colors.black),
+                    companyName.text.trim().isEmpty
+                        ? 'COMPANY NAME'
+                        : companyName.text.trim().toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 15,
+                    ),
                   ),
-                Text(
-                  'MODEL: ${model.text.isEmpty ? '—' : model.text}   $port',
-                  style: const TextStyle(color: Colors.black, fontSize: 11),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 105,
-                  width: double.infinity,
-                  child: BarcodeView(data: codeData, symbology: codeSymbology),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  codeData,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontFamily: 'monospace',
-                    fontSize: 10,
+                  Text(
+                    companyAddress.text.trim().isEmpty
+                        ? 'COMPANY ADDRESS'
+                        : companyAddress.text.trim().toUpperCase(),
+                    style: const TextStyle(color: Colors.black54, fontSize: 9),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (includeName)
+                    Text(
+                      'ITEM: ${itemName.text.isEmpty ? '—' : itemName.text}',
+                      style: const TextStyle(color: Colors.black),
+                    ),
+                  Text(
+                    'MODEL: ${model.text.isEmpty ? '—' : model.text}   ${portLabel.text.trim().isEmpty ? '-' : portLabel.text.trim()}',
+                    style: const TextStyle(color: Colors.black, fontSize: 11),
+                  ),
+                  Text(
+                    'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}   TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
+                    style: const TextStyle(color: Colors.black, fontSize: 10),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 105,
+                    width: double.infinity,
+                    child: BarcodeView(data: codeData, symbology: codeSymbology),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    codeData,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontFamily: 'monospace',
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -666,8 +849,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     String label,
     IconData icon, {
     bool number = false,
+    bool enabled = true,
   }) => TextField(
     controller: controller,
+    enabled: enabled,
     keyboardType: number ? TextInputType.number : null,
     decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
   );
@@ -830,6 +1015,11 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       symbology: symbology,
       itemName: withName ? itemName.text : '',
       model: model.text,
+      partNumber: partNumber.text.trim(),
+      port: portLabel.text.trim(),
+      dateText: labelDate.text.trim(),
+      timeText: labelTime.text.trim(),
+      dualSideCodes: dualSideCodes,
       company: companyName.text.trim(),
       companyAddress: companyAddress.text.trim(),
       packQty: int.tryParse(pack.text) ?? 1,
@@ -845,6 +1035,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     }
     setState(() => busy = true);
     try {
+      if (autoDateTime) {
+        _stampNow();
+      }
       final bytes = await const BrowserPdfGenerator().generate(_getDocument(withName ?? includeName));
       await gateway.download(bytes, 'codevault-${partNumber.text}.pdf');
       _notice('Label PDF generated');
@@ -863,6 +1056,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     }
     setState(() => busy = true);
     try {
+      if (autoDateTime) {
+        _stampNow();
+      }
       final bytes = await const BrowserPdfGenerator().generate(_getDocument(withName ?? includeName));
       if (_selectedPrinter != null) {
         await Printing.directPrintPdf(
@@ -890,6 +1086,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     dr.text = 'NR';
     pack.text = '1';
     quantity.text = '1';
+    if (autoDateTime) {
+      _stampNow();
+    }
     message = 'Ready for production';
   });
 

@@ -15,6 +15,11 @@ class BrowserLabelDocument {
     this.companyAddress = '',
     this.itemName = '',
     this.model = '',
+    this.partNumber = '',
+    this.port = '',
+    this.dateText = '',
+    this.timeText = '',
+    this.dualSideCodes = false,
     this.packQty = 1,
     this.stickersPerRow = 1,
     this.includeBorder = true,
@@ -28,6 +33,11 @@ class BrowserLabelDocument {
   final String companyAddress;
   final String itemName;
   final String model;
+  final String partNumber;
+  final String port;
+  final String dateText;
+  final String timeText;
+  final bool dualSideCodes;
   final int packQty;
   final int stickersPerRow;
   final bool includeBorder;
@@ -38,6 +48,7 @@ class BrowserPdfGenerator {
 
   Future<Uint8List> generate(BrowserLabelDocument label) async {
     final document = pw.Document();
+    final twinCodes = label.dualSideCodes && label.symbology != 'code128';
 
     // ── Label dimensions in PDF points ──────────────────────────────────────
     final wPt = label.widthMm * PdfPageFormat.mm;
@@ -65,14 +76,23 @@ class BrowserPdfGenerator {
 
     final innerW = wPt - pad * 2;
     final innerH = hPt - pad * 2;
+    final twinSide = (innerH * 0.68).clamp(innerH * 0.50, innerW * 0.24);
+    final centerW = (innerW - (twinSide * 2) - (gap * 2)).clamp(10.0, innerW);
 
     // ── Estimate text block height ───────────────────────────────────────────
-    final numTextLines = 1                                          // company
-        + (label.companyAddress.isNotEmpty ? 1 : 0)
-        + 1                                                         // title
-        + (label.itemName.isNotEmpty ? 1 : 0)
-        + (label.model.isNotEmpty ? 1 : 0)
-        + 1;                                                        // content
+    final numTextLines = twinCodes
+      ? 4 + (label.itemName.isNotEmpty ? 1 : 0)
+      : 1 +
+          (label.companyAddress.isNotEmpty ? 1 : 0) +
+          1 +
+          (label.itemName.isNotEmpty ? 1 : 0) +
+          (label.model.isNotEmpty ? 1 : 0) +
+          ((label.port.isNotEmpty ||
+              label.dateText.isNotEmpty ||
+              label.timeText.isNotEmpty)
+            ? 1
+            : 0) +
+          1;
     final avgLineH = ((fCompany + fSmall + fTitle + fContent) / 4.0);
     final textBlockH = numTextLines * avgLineH + gap * 2;
 
@@ -96,51 +116,119 @@ class BrowserPdfGenerator {
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           mainAxisSize: pw.MainAxisSize.min,
           children: [
-          pw.Text(
-            label.company,
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: fCompany),
-          ),
-          if (label.companyAddress.isNotEmpty)
+          if (twinCodes)
+            ...[
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _buildSquareCode(
+                    label: label,
+                    side: twinSide,
+                  ),
+                  pw.SizedBox(width: gap),
+                  pw.SizedBox(
+                    width: centerW,
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        pw.Text(
+                          label.company.isEmpty ? 'COMPANY' : label.company.toUpperCase(),
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: fCompany,
+                          ),
+                        ),
+                        pw.Text(
+                          'MODEL: ${label.model.isEmpty ? '-' : label.model.toUpperCase()}    ${label.port.isEmpty ? 'PORT -' : label.port.toUpperCase()}',
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(fontSize: fSmall),
+                        ),
+                        pw.Text(
+                          'DATE: ${label.dateText.isEmpty ? '-' : label.dateText}    TIME: ${label.timeText.isEmpty ? '-' : label.timeText}',
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(fontSize: fSmall),
+                        ),
+                        pw.Text(
+                          'PART NO: ${label.partNumber.isEmpty ? '-' : label.partNumber}',
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(
+                            fontWeight: pw.FontWeight.bold,
+                            fontSize: fTitle,
+                          ),
+                        ),
+                        if (label.itemName.isNotEmpty)
+                          pw.Text(
+                            label.itemName,
+                            textAlign: pw.TextAlign.center,
+                            style: pw.TextStyle(fontSize: fSmall),
+                          ),
+                      ],
+                    ),
+                  ),
+                  pw.SizedBox(width: gap),
+                  _buildSquareCode(
+                    label: label,
+                    side: twinSide,
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: gap * 0.5),
+              pw.Text(
+                label.content,
+                maxLines: 1,
+                overflow: pw.TextOverflow.clip,
+                style: pw.TextStyle(fontSize: fContent),
+              ),
+            ]
+          else ...[
             pw.Text(
-              label.companyAddress,
-              style: pw.TextStyle(fontSize: fSmall, color: PdfColors.grey700),
+              label.company,
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: fCompany),
             ),
-          pw.Text(
-            label.title,
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: fTitle),
-          ),
-          if (label.itemName.isNotEmpty)
+            if (label.companyAddress.isNotEmpty)
+              pw.Text(
+                label.companyAddress,
+                style: pw.TextStyle(fontSize: fSmall, color: PdfColors.grey700),
+              ),
             pw.Text(
-              'ITEM: ${label.itemName}',
-              style: pw.TextStyle(fontSize: fSmall),
+              label.title,
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: fTitle),
             ),
-          if (label.model.isNotEmpty)
+            if (label.itemName.isNotEmpty)
+              pw.Text(
+                'ITEM: ${label.itemName}',
+                style: pw.TextStyle(fontSize: fSmall),
+              ),
+            if (label.model.isNotEmpty || label.port.isNotEmpty)
+              pw.Text(
+                'MODEL: ${label.model.isEmpty ? '-' : label.model}${label.port.isEmpty ? '' : '    ${label.port}'}',
+                style: pw.TextStyle(fontSize: fSmall),
+              ),
+            if (label.dateText.isNotEmpty || label.timeText.isNotEmpty)
+              pw.Text(
+                'DATE: ${label.dateText.isEmpty ? '-' : label.dateText}    TIME: ${label.timeText.isEmpty ? '-' : label.timeText}',
+                style: pw.TextStyle(fontSize: fSmall),
+              ),
+            pw.SizedBox(height: gap),
+            // Barcode box — strictly fixed width×height, never expands
+            pw.SizedBox(
+              width: barcodeW,
+              height: barcodeH,
+              child: pw.BarcodeWidget(
+                barcode: _barcodeFor(label.symbology),
+                data: label.content,
+                drawText: false,
+              ),
+            ),
+            pw.SizedBox(height: gap * 0.5),
             pw.Text(
-              'MODEL: ${label.model}',
-              style: pw.TextStyle(fontSize: fSmall),
+              label.content,
+              maxLines: 1,
+              overflow: pw.TextOverflow.clip,
+              style: pw.TextStyle(fontSize: fContent),
             ),
-          pw.SizedBox(height: gap),
-          // Barcode box — strictly fixed width×height, never expands
-          pw.SizedBox(
-            width: barcodeW,
-            height: barcodeH,
-            child: pw.BarcodeWidget(
-              barcode: switch (label.symbology) {
-                'qr'          => Barcode.qrCode(),
-                'data_matrix' => Barcode.dataMatrix(),
-                _             => Barcode.code128(),
-              },
-              data: label.content,
-              drawText: false,
-            ),
-          ),
-          pw.SizedBox(height: gap * 0.5),
-          pw.Text(
-            label.content,
-            maxLines: 1,
-            overflow: pw.TextOverflow.clip,
-            style: pw.TextStyle(fontSize: fContent),
-          ),
+          ],
         ],
         ),
       ),   // Container
@@ -187,6 +275,25 @@ class BrowserPdfGenerator {
 
     return document.save();
   }
+
+  Barcode _barcodeFor(String symbology) => switch (symbology) {
+    'qr' => Barcode.qrCode(),
+    'data_matrix' => Barcode.dataMatrix(),
+    _ => Barcode.code128(),
+  };
+
+  pw.Widget _buildSquareCode({
+    required BrowserLabelDocument label,
+    required double side,
+  }) => pw.SizedBox(
+    width: side,
+    height: side,
+    child: pw.BarcodeWidget(
+      barcode: _barcodeFor(label.symbology == 'code128' ? 'qr' : label.symbology),
+      data: label.content,
+      drawText: false,
+    ),
+  );
 }
 
 abstract interface class BrowserPrintGateway {

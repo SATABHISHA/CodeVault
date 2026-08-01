@@ -34,27 +34,56 @@
 </head>
 <body>
   <script>
-    (async function() {
-      const resetVersion = 'wasm-mime-fix-2026-08-01';
-      const resetKey = 'codevault.cacheResetVersion';
+    // Canonicalize stale deep links from old Windows-targeted URLs.
+    // Example: /windows/operations#/login -> /#/login
+    (function() {
       try {
-        if (
-          'serviceWorker' in navigator &&
-          window.localStorage &&
-          localStorage.getItem(resetKey) !== resetVersion
-        ) {
-          localStorage.setItem(resetKey, resetVersion);
-          const registrations = await navigator.serviceWorker.getRegistrations();
-          await Promise.all(registrations.map((registration) => registration.unregister()));
-          if ('caches' in window) {
-            const keys = await caches.keys();
-            await Promise.all(keys.map((key) => caches.delete(key)));
-          }
-          window.location.reload();
-          return;
+        if (window.location.pathname.startsWith('/windows')) {
+          const hash =
+              window.location.hash && window.location.hash.startsWith('#/')
+                  ? window.location.hash
+                  : '#/login';
+          const query = window.location.search || '';
+          window.history.replaceState(null, '', '/' + query + hash);
         }
       } catch (_) {
-        // Ignore browser cache-reset issues and continue bootstrap.
+        // Ignore URL normalization issues and continue bootstrap.
+      }
+    })();
+
+    // Build-aware cache reset. Detects every new deployment by hashing the
+    // generated service-worker manifest (its resource hashes change per build)
+    // and clears stale service-worker caches so returning browsers always load
+    // the newest build. Self-terminating: it only reloads once per new build.
+    (async function() {
+      const markerKey = 'codevault.buildMarker';
+      try {
+        const response = await fetch('flutter_service_worker.js', { cache: 'no-store' });
+        const text = await response.text();
+        let hash = 0;
+        for (let i = 0; i < text.length; i++) {
+          hash = (hash * 31 + text.charCodeAt(i)) | 0;
+        }
+        const marker = String(hash);
+        const stored = window.localStorage ? localStorage.getItem(markerKey) : null;
+        if (stored !== marker) {
+          if (window.localStorage) localStorage.setItem(markerKey, marker);
+          // Only force a reset when this browser has an older build cached.
+          if (stored !== null) {
+            if ('serviceWorker' in navigator) {
+              const registrations = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(registrations.map((r) => r.unregister()));
+            }
+            if ('caches' in window) {
+              const keys = await caches.keys();
+              await Promise.all(keys.map((key) => caches.delete(key)));
+            }
+            window.location.reload();
+            return;
+          }
+        }
+      } catch (_) {
+        // Ignore cache-reset issues and continue normal bootstrap.
       }
     })();
 

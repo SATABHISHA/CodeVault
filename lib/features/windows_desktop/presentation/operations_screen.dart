@@ -21,11 +21,32 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
   final serial = TextEditingController();
   final dr = TextEditingController();
   final port = TextEditingController();
+  final company = TextEditingController();
+  final date = TextEditingController();
+  final time = TextEditingController();
   final pack = TextEditingController(text: '1');
   final quantity = TextEditingController(text: '1');
   bool includeName = true;
+  bool dualSideCodes = true;
+  bool autoDateTime = true;
   String format = 'Barcode';
   String status = 'Ready';
+
+  @override
+  void initState() {
+    super.initState();
+    _stampNow();
+  }
+
+  String _twoDigits(int value) => value.toString().padLeft(2, '0');
+
+  void _stampNow() {
+    final now = DateTime.now();
+    date.text = '${_twoDigits(now.day)}-${_twoDigits(now.month)}-${now.year}';
+    time.text =
+        '${_twoDigits(now.hour)}:${_twoDigits(now.minute)}:${_twoDigits(now.second)}';
+  }
+
   String get content => [
     part.text,
     model.text,
@@ -72,6 +93,24 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
               child: AppTextField(label: 'Port', controller: port),
             ),
             SizedBox(
+              width: 280,
+              child: AppTextField(label: 'Company', controller: company),
+            ),
+            SizedBox(
+              width: 220,
+              child: AppTextField(
+                label: 'Date (DD-MM-YYYY)',
+                controller: date,
+              ),
+            ),
+            SizedBox(
+              width: 220,
+              child: AppTextField(
+                label: 'Time (HH:MM:SS)',
+                controller: time,
+              ),
+            ),
+            SizedBox(
               width: 180,
               child: AppTextField(label: 'Pack quantity', controller: pack),
             ),
@@ -102,6 +141,33 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
         ),
       ),
       const SizedBox(height: 20),
+      Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          FilterChip(
+            label: const Text('Dual left-right code format'),
+            selected: dualSideCodes,
+            onSelected: (value) => setState(() => dualSideCodes = value),
+          ),
+          FilterChip(
+            label: const Text('Auto date/time'),
+            selected: autoDateTime,
+            onSelected: (value) {
+              setState(() => autoDateTime = value);
+              if (value) {
+                _stampNow();
+              }
+            },
+          ),
+          OutlinedButton.icon(
+            onPressed: () => setState(_stampNow),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh timestamp'),
+          ),
+        ],
+      ),
+      const SizedBox(height: 12),
       Row(
         children: [
           Expanded(
@@ -113,10 +179,39 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
                 ),
                 const SizedBox(height: 8),
                 LabelPreview(
-                  content: Center(
-                    child: Text(
-                      content.isEmpty ? 'Enter part and serial data' : content,
-                    ),
+                  content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (dualSideCodes)
+                        Row(
+                          children: const [
+                            Icon(Icons.qr_code_2, size: 28),
+                            Spacer(),
+                            Icon(Icons.qr_code_2, size: 28),
+                          ],
+                        ),
+                      Text(
+                        company.text.trim().isEmpty
+                            ? 'COMPANY NAME'
+                            : company.text.trim().toUpperCase(),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'MODEL: ${model.text.isEmpty ? '-' : model.text.toUpperCase()}    ${port.text.isEmpty ? 'PORT -' : port.text.toUpperCase()}',
+                      ),
+                      Text(
+                        'DATE: ${date.text.isEmpty ? '-' : date.text}    TIME: ${time.text.isEmpty ? '-' : time.text}',
+                      ),
+                      Text(
+                        'PART NO: ${part.text.isEmpty ? '-' : part.text}',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        content.isEmpty ? 'Enter part and serial data' : content,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -193,10 +288,15 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
   Future<void> _print({bool? withName}) async {
     final copies = int.tryParse(quantity.text) ?? 0;
     final include = withName ?? includeName;
+    if (autoDateTime) {
+      _stampNow();
+    }
     final receipt = await printer.print(
       PrintRequest(
         jobId: const Uuid().v4(),
-        content: include ? '${part.text}\n$content' : content,
+        content: include
+            ? '${company.text}\nMODEL:${model.text} ${port.text}\nDATE:${date.text} TIME:${time.text}\nPART:${part.text}\n$content'
+            : content,
         copies: copies,
       ),
     );
