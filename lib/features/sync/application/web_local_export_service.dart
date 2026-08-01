@@ -18,9 +18,14 @@ class WebImportReport {
 }
 
 class PortableAlignmentSafetyExporter implements AlignmentSafetyExporter {
-  const PortableAlignmentSafetyExporter(this.service, this.save);
+  const PortableAlignmentSafetyExporter(
+    this.service,
+    this.save, {
+    required this.ownerUserId,
+  });
   final WebLocalExportService service;
   final Future<String> Function(Uint8List bytes, String filename) save;
+  final String ownerUserId;
 
   @override
   Future<String> createSafetyExport(
@@ -28,7 +33,14 @@ class PortableAlignmentSafetyExporter implements AlignmentSafetyExporter {
     int localGeneration,
   ) async {
     final filename = 'codevault-$tenantId-generation-$localGeneration.cvbackup';
-    return save(await service.export(tenantId, localGeneration), filename);
+    return save(
+      await service.export(
+        tenantId,
+        localGeneration,
+        ownerUserId: ownerUserId,
+      ),
+      filename,
+    );
   }
 }
 
@@ -36,7 +48,11 @@ class WebLocalExportService {
   const WebLocalExportService(this.database);
   final AndroidCacheDatabase database;
 
-  Future<Uint8List> export(String tenantId, int generation) async {
+  Future<Uint8List> export(
+    String tenantId,
+    int generation, {
+    required String ownerUserId,
+  }) async {
     final parts = await (database.select(
       database.cachedParts,
     )..where((row) => row.tenantId.equals(tenantId))).get();
@@ -110,6 +126,7 @@ class WebLocalExportService {
       'format_version': 1,
       'schema_version': database.schemaVersion,
       'tenant_id': tenantId,
+      'owner_user_id': ownerUserId,
       'generation': generation,
       'payload_sha256': checksum,
       'created_at': DateTime.now().toUtc().toIso8601String(),
@@ -126,6 +143,7 @@ class WebLocalExportService {
   Future<WebImportReport> import(
     Uint8List bytes, {
     required String tenantId,
+    required String currentUserId,
     required int serverGeneration,
     bool replace = false,
   }) async {
@@ -142,6 +160,12 @@ class WebLocalExportService {
         manifest['tenant_id'] != tenantId) {
       throw const FormatException(
         'Export belongs to another tenant or format.',
+      );
+    }
+    final ownerUserId = manifest['owner_user_id'] as String?;
+    if (ownerUserId != null && ownerUserId != currentUserId) {
+      throw StateError(
+        'This backup belongs to another signed-in user account.',
       );
     }
     if ((manifest['generation'] as int) < serverGeneration) {

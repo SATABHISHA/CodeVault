@@ -1,93 +1,61 @@
-# ============================================================
-# deploy_web.ps1 — Build Flutter Web and deploy to Hostinger
-# ============================================================
+﻿# deploy_web.ps1
+# Build Flutter Web and upload directly to Hostinger via SSH/SCP.
+# No git branch switching. No web-production branch.
+#
 # Usage:
 #   .\scripts\deploy_web.ps1
 #
-# What it does:
-#   1. flutter build web --release
-#   2. Updates the web-production branch with the new build
-#   3. Pushes to GitHub (origin/web-production)
-#
-# To publish to Hostinger after running this script:
-#   ssh hostinger-codevault "cd ~/domains/scanhub.sroy.es/public_html && git pull"
-# ============================================================
+# Prerequisites:
+#   - SSH key added to Hostinger (done once via setup)
+#   - ~/.ssh/config entry named hostinger-codevault
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$RepoRoot = Split-Path -Parent $PSScriptRoot
-$WorktreeDir = Join-Path $env:TEMP "codevault-web-deploy-worktree"
+$RepoRoot   = Split-Path -Parent $PSScriptRoot
+$BuildSrc   = Join-Path $RepoRoot "build\web"
+$TarFile    = Join-Path $env:TEMP "codevault_web.tar.gz"
+$RemoteDir  = "~/domains/scanhub.sroy.es/public_html"
+$SshAlias   = "hostinger-codevault"
 
 Push-Location $RepoRoot
-
 try {
-    # --- 1. Build Flutter Web ---
-    Write-Host "`n[1/4] Building Flutter web (release)..." -ForegroundColor Cyan
-    flutter build web --release
-    if ($LASTEXITCODE -ne 0) { throw "flutter build web failed." }
-
-    $BuildSrc = Join-Path $RepoRoot "build\web"
+    # 1. Build
+    Write-Host ""
+    Write-Host "[1/3] Building Flutter web (release)..." -ForegroundColor Cyan
+    & flutter build web --release
+    if ($LASTEXITCODE -ne 0) { throw "flutter build web failed (exit $LASTEXITCODE)." }
     if (-not (Test-Path $BuildSrc)) { throw "build\web not found after build." }
 
-    # --- 2. Prepare worktree for web-production branch ---
-    Write-Host "`n[2/4] Preparing web-production worktree..." -ForegroundColor Cyan
+    # 2. Package
+    Write-Host "[2/3] Packaging build output..." -ForegroundColor Cyan
+    if (Test-Path $TarFile) { Remove-Item $TarFile -Force }
+    & tar -czf $TarFile -C $BuildSrc .
+    if ($LASTEXITCODE -ne 0) { throw "tar packaging failed." }
+    $sizeMB = [Math]::Round((Get-Item $TarFile).Length / 1MB, 1)
+    Write-Host "  Package size: ${sizeMB} MB" -ForegroundColor DarkGray
 
-    if (Test-Path $WorktreeDir) {
-        git worktree remove --force $WorktreeDir 2>$null
-        if (Test-Path $WorktreeDir) { Remove-Item -Recurse -Force $WorktreeDir }
-    }
+    # 3. Upload and extract on server
+    Write-Host "[3/3] Uploading to Hostinger..." -ForegroundColor Cyan
+    & scp $TarFile "${SshAlias}:~/web_deploy.tar.gz"
+    if ($LASTEXITCODE -ne 0) { throw "scp upload failed." }
 
-    git fetch origin web-production
-    git worktree add $WorktreeDir web-production
+    $HtaccessSrc = Join-Path $RepoRoot "web\.htaccess"
+    & scp $HtaccessSrc "${SshAlias}:~/web_htaccess"
+    if ($LASTEXITCODE -ne 0) { throw "scp .htaccess upload failed." }
 
-    # --- 3. Sync build output into the worktree ---
-    Write-Host "`n[3/4] Syncing build files to web-production..." -ForegroundColor Cyan
+    & ssh $SshAlias "find $RemoteDir -mindepth 1 -delete 2>/dev/null; tar -xzf ~/web_deploy.tar.gz -C $RemoteDir; mv ~/web_htaccess $RemoteDir/.htaccess; rm -f ~/web_deploy.tar.gz; echo OK"
+    if ($LASTEXITCODE -ne 0) { throw "Remote extract failed." }
 
-    Push-Location $WorktreeDir
-    try {
-        # Remove all tracked files (keep .git)
-        git rm -rf . --quiet
-
-        # Copy build/web contents into the worktree root
-        Copy-Item -Path "$BuildSrc\*" -Destination $WorktreeDir -Recurse -Force
-
-        # Commit
-        $Timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        $CommitMsg = "Deploy web build - $Timestamp"
-        git add -A
-        git diff --cached --quiet
-        if ($LASTEXITCODE -eq 0) {
-            Write-Host "No changes detected — already up to date." -ForegroundColor Yellow
-        } else {
-            git commit -m $CommitMsg
-            Write-Host "Committed: $CommitMsg" -ForegroundColor Green
-        }
-    } finally {
-        Pop-Location
-    }
-
-    # --- 4. Push to GitHub ---
-    Write-Host "`n[4/4] Pushing web-production to GitHub..." -ForegroundColor Cyan
-    git push origin web-production
-    if ($LASTEXITCODE -ne 0) { throw "git push failed." }
-
-    Write-Host "`n=== Build deployed to GitHub (web-production) ===" -ForegroundColor Green
     Write-Host ""
-    Write-Host "To go live on Hostinger, run:" -ForegroundColor Yellow
-    Write-Host '  ssh hostinger-codevault "cd ~/domains/scanhub.sroy.es/public_html && git pull"' -ForegroundColor White
+    Write-Host "=== Live on https://scanhub.sroy.es ===" -ForegroundColor Green
     Write-Host ""
-    Write-Host "Or to build + deploy + pull in one shot:" -ForegroundColor Yellow
-    Write-Host '  .\scripts\deploy_web.ps1 ; ssh hostinger-codevault "cd ~/domains/scanhub.sroy.es/public_html && git pull"' -ForegroundColor White
 
 } catch {
-    Write-Host "`n[ERROR] $_" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "[ERROR] $($_.Exception.Message)" -ForegroundColor Red
     exit 1
 } finally {
-    # Clean up worktree
-    if (Test-Path $WorktreeDir) {
-        git worktree remove --force $WorktreeDir 2>$null
-        if (Test-Path $WorktreeDir) { Remove-Item -Recurse -Force $WorktreeDir 2>$null }
-    }
+    if (Test-Path $TarFile) { Remove-Item $TarFile -ErrorAction SilentlyContinue }
     Pop-Location
 }

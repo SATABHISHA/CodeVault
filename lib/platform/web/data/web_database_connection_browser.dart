@@ -7,7 +7,7 @@ QueryExecutor openWebDatabase(String tenantId) => LazyDatabase(() async {
   }
   final result = await WasmDatabase.open(
     databaseName: 'codevault-$tenantId',
-    sqlite3Uri: Uri.parse('sqlite3.wasm'),
+    sqlite3Uri: Uri.parse('sqlite3.wasm?no-sw=1'),
     driftWorkerUri: Uri.parse('drift_worker.js'),
   );
   return result.resolvedExecutor;

@@ -34,26 +34,40 @@ class AppearanceController extends Notifier<AppearanceState> {
   }
 
   Future<void> _restore() async {
-    final skin = await _store.readKey('appearance.skin');
-    final mode = await _store.readKey('appearance.mode');
-    state = AppearanceState(
-      skin:
-          AppSkin.values.where((value) => value.name == skin).firstOrNull ??
-          state.skin,
-      mode:
-          ThemeMode.values.where((value) => value.name == mode).firstOrNull ??
-          state.mode,
-    );
+    try {
+      final skin = await _store.readKey('appearance.skin');
+      final mode = await _store.readKey('appearance.mode');
+      state = AppearanceState(
+        skin:
+            AppSkin.values.where((value) => value.name == skin).firstOrNull ??
+            state.skin,
+        mode:
+            ThemeMode.values
+                .where((value) => value.name == mode)
+                .firstOrNull ??
+            state.mode,
+      );
+    } catch (_) {
+      // Appearance preferences are optional.
+    }
   }
 
   Future<void> setSkin(AppSkin skin) async {
     state = AppearanceState(mode: state.mode, skin: skin);
-    await _store.writeKey('appearance.skin', skin.name);
+    try {
+      await _store.writeKey('appearance.skin', skin.name);
+    } catch (_) {
+      // Ignore optional preference persistence failures.
+    }
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
     state = AppearanceState(mode: mode, skin: state.skin);
-    await _store.writeKey('appearance.mode', mode.name);
+    try {
+      await _store.writeKey('appearance.mode', mode.name);
+    } catch (_) {
+      // Ignore optional preference persistence failures.
+    }
   }
 }
 

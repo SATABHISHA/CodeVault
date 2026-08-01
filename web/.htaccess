@@ -1,0 +1,25 @@
+# ── MIME types ───────────────────────────────────────────────────────────────
+# Force application/wasm so browsers can compile sqlite3.wasm and CanvasKit.
+# AddType is blocked on some hosts; Header always set overrides at response level.
+<FilesMatch "\.wasm$">
+    Header always set Content-Type "application/wasm"
+</FilesMatch>
+
+# ── Service-worker / bootstrap cache policy ──────────────────────────────────
+# Never cache these files so browsers always fetch the latest build.
+<FilesMatch (flutter_service_worker\.js|flutter_bootstrap\.js|flutter\.js|main\.dart\.js|drift_worker\.js|sqlite3\.wasm|index\.html|version\.json)$>
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma no-cache
+    Header set Expires 0
+</FilesMatch>
+
+# ── SPA fallback ─────────────────────────────────────────────────────────────
+# Return index.html for any path that does not match a real file/directory,
+# so GoRouter deep-links work on hard reload.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.html [L]
+</IfModule>

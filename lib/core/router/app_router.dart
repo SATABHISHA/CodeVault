@@ -1,6 +1,8 @@
+import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:codevault/features/authentication/presentation/login_screen.dart';
 import 'package:codevault/features/administration/presentation/administration_screen.dart';
 import 'package:codevault/features/authentication/presentation/change_password_screen.dart';
+import 'package:codevault/features/authentication/presentation/session_controller.dart';
 import 'package:codevault/features/authentication/presentation/splash_screen.dart';
 import 'package:codevault/features/authentication/presentation/forgot_password_screen.dart';
 import 'package:codevault/features/labels/presentation/label_studio_screen.dart';
@@ -18,41 +20,39 @@ import 'package:codevault/features/windows_desktop/presentation/user_management_
 import 'package:codevault/features/windows_desktop/presentation/windows_dashboard_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:codevault/core/platform/platform_capabilities.dart';
-import 'package:codevault/features/authentication/presentation/session_controller.dart';
 
 final appRouterProvider = Provider<GoRouter>(
   (ref) => GoRouter(
     initialLocation: '/splash',
     redirect: (context, state) {
-      final isWindows = PlatformCapabilities.current().isWindows;
       final path = state.uri.path;
+      final isWindows = PlatformCapabilities.current().isWindows;
 
+      // ── Windows ──────────────────────────────────────────────────────────
+      // Local setup / local login — no Laravel involvement.
       if (isWindows) {
         if (path == '/splash') return null;
-        // Allow shared routes that are valid for Windows (inside the ShellRoute)
-        const windowsAllowedShared = ['/backup', '/profile', '/about'];
-        if (!path.startsWith('/windows') && !windowsAllowedShared.contains(path)) {
+        const windowsAllowed = ['/backup', '/profile', '/about'];
+        if (!path.startsWith('/windows') && !windowsAllowed.contains(path)) {
           return '/windows';
         }
         return null;
       }
 
+      // ── Web / Android ─────────────────────────────────────────────────────
+      // Laravel login gate. Web/Android stay on non-Windows routes.
       final session = ref.read(sessionProvider);
       final isAuth = session.authenticated;
+      const authRoutes = ['/login', '/forgot-password', '/splash'];
 
-      final isAuthRoute = path == '/login' ||
-          path == '/forgot-password' ||
-          path == '/splash';
+      if (!isAuth && !authRoutes.contains(path)) return '/login';
 
-      if (!isAuth && !isAuthRoute) {
-        return '/login';
-      }
+      // Non-Windows must not enter Windows setup/admin routes.
+      if (isAuth && path.startsWith('/windows')) return '/dashboard';
 
-      if (isAuth && isAuthRoute && path != '/splash') {
+      if (isAuth && authRoutes.contains(path) && path != '/splash') {
         return '/dashboard';
       }
-
       return null;
     },
     routes: [

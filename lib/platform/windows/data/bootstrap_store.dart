@@ -1,4 +1,5 @@
 import 'bootstrap_store_stub.dart'
+    if (dart.library.js_interop) 'bootstrap_store_web.dart'
     if (dart.library.io) 'bootstrap_store_native.dart'
     as implementation;
 

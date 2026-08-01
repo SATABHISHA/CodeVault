@@ -40,8 +40,6 @@ class AppShell extends ConsumerWidget {
             (Icons.person_outline, 'Profile', '/profile'),
             (Icons.info_outline, 'About', '/about'),
           ]
-        : PlatformCapabilities.current().isAndroid
-        ? cloudDestinations
         : cloudDestinations;
     final destinations = baseDestinations
         .where(

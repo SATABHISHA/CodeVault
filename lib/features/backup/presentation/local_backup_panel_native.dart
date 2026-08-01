@@ -9,7 +9,8 @@ import '../../windows_desktop/application/local_backup_service.dart';
 import '../../windows_desktop/data/local_database.dart';
 
 class LocalBackupPanel extends StatefulWidget {
-  const LocalBackupPanel({super.key});
+  const LocalBackupPanel({required this.userId, super.key});
+  final String userId;
   @override
   State<LocalBackupPanel> createState() => _LocalBackupPanelState();
 }
@@ -97,6 +98,7 @@ class _LocalBackupPanelState extends State<LocalBackupPanel> {
       final value = await _database();
       await service.create(
         companyId: value.$1,
+        ownerUserId: widget.userId,
         database: value.$2,
         destination: File(target.path),
       );
@@ -116,6 +118,9 @@ class _LocalBackupPanelState extends State<LocalBackupPanel> {
       final manifest = await service.verify(File(source.path));
       if (manifest.companyId != value.$1) {
         throw StateError('This backup belongs to another company.');
+      }
+      if (manifest.ownerUserId != null && manifest.ownerUserId != widget.userId) {
+        throw StateError('This backup belongs to another signed-in user account.');
       }
       if (mode == RestoreMode.merge) {
         final database = LocalDatabase(value.$1);

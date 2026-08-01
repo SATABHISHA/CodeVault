@@ -62,9 +62,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     Text(
                       PlatformCapabilities.current().isWindows
                           ? 'Local Windows account · ${WindowsSession.role ?? 'user'}'
-                          : session.tenantId == null
-                              ? 'Platform administration account'
-                              : 'Tenant production account',
+                          : 'Local account · ${WindowsSession.role?.isNotEmpty == true ? WindowsSession.role : 'user'}',
                       style: const TextStyle(color: Colors.white70),
                     ),
                   ],
@@ -294,6 +292,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     } catch (_) {
       /* local token is still cleared */
     }
+    WindowsSession.clear();
     ref.read(sessionProvider.notifier).signOut();
     if (mounted) context.go('/login');
   }

@@ -5,8 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:printing/printing.dart';
 
-import '../../../features/authentication/presentation/session_controller.dart';
-import '../../../core/platform/platform_capabilities.dart';
+import '../../../core/platform/platform_capabilities.dart' show PlatformCapabilities;
 import '../../windows_desktop/application/windows_session.dart';
 import '../../windows_desktop/data/local_database.dart' show LocalDatabase;
 import '../../../features/printers/data/printing_browser_gateway.dart';
@@ -14,8 +13,8 @@ import '../../../features/printers/domain/browser_printing.dart';
 import '../../../shared/widgets/barcode_view.dart';
 import '../application/production_activity.dart';
 import '../data/local_part_repository.dart';
-import '../data/web_local_part_repository.dart';
 import '../data/part_repository.dart';
+import '../data/web_local_part_repository.dart';
 
 class LabelStudioScreen extends ConsumerStatefulWidget {
   const LabelStudioScreen({super.key, this.repository, this.printGateway});
@@ -31,15 +30,14 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   late final BrowserPrintGateway gateway =
       widget.printGateway ?? const PrintingBrowserGateway();
 
-  /// Returns [LocalPartRepository] on Windows (offline SQLite) or
-  /// [WebLocalPartRepository] on every other platform.
+  /// Returns the platform-local repository.
+  /// Windows: full local company SQLite.
+  /// Web/Android: local cache database (Drift WASM / SQLite).
   PartRepository _initRepository() {
     if (widget.repository != null) return widget.repository!;
-    if (PlatformCapabilities.current().isWindows) {
-      final companyId = WindowsSession.companyId;
-      if (companyId != null) {
-        return LocalPartRepository(LocalDatabase(companyId));
-      }
+    final companyId = WindowsSession.companyId;
+    if (PlatformCapabilities.current().isWindows && companyId != null) {
+      return LocalPartRepository(LocalDatabase(companyId));
     }
     return WebLocalPartRepository();
   }
@@ -81,14 +79,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   @override
   void initState() {
     super.initState();
-    final remote = ref.read(sessionProvider);
-    if (PlatformCapabilities.current().isWindows) {
-      companyName.text = WindowsSession.companyName;
-      companyAddress.text = WindowsSession.companyAddress;
-    } else {
-      companyName.text = remote.companyName;
-      companyAddress.text = remote.companyAddress;
-    }
+    companyName.text = WindowsSession.companyName;
+    companyAddress.text = WindowsSession.companyAddress;
     search.addListener(_searchChanged);
     for (final controller in [
       partNumber,
@@ -713,9 +705,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   };
 
   Future<void> _load() async {
-    // Resolve tenant: prefer cloud session, fall back to Windows local login.
-    final tenant =
-        ref.read(sessionProvider).tenantId ?? WindowsSession.companyId;
+    final tenant = WindowsSession.companyId;
     if (tenant == null) {
       setState(() {
         parts = const [];
@@ -778,9 +768,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       _notice('Part number and item name are required');
       return;
     }
-    // Resolve tenant: prefer cloud session, fall back to Windows local login.
-    final tenant =
-        ref.read(sessionProvider).tenantId ?? WindowsSession.companyId;
+    final tenant = WindowsSession.companyId;
     if (tenant == null) {
       _notice('Please sign in before making part master changes');
       return;
@@ -798,9 +786,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   }
 
   Future<void> _delete() async {
-    // Resolve tenant: prefer cloud session, fall back to Windows local login.
-    final tenant =
-        ref.read(sessionProvider).tenantId ?? WindowsSession.companyId;
+    final tenant = WindowsSession.companyId;
     if (tenant == null || selected == null) return;
     final confirmed =
         await showDialog<bool>(

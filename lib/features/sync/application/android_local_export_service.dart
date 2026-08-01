@@ -10,10 +10,12 @@ class AndroidExportManifest {
     required this.tenantId,
     required this.generation,
     required this.checksum,
+    this.ownerUserId,
   });
   final String tenantId;
   final int generation;
   final String checksum;
+  final String? ownerUserId;
 }
 
 class AndroidLocalExportService {
@@ -21,6 +23,7 @@ class AndroidLocalExportService {
   Future<void> export({
     required String tenantId,
     required int generation,
+    String? ownerUserId,
     required File cacheDatabase,
     required File destination,
   }) async {
@@ -33,6 +36,7 @@ class AndroidLocalExportService {
       'format': 'codevault-android-cache',
       'format_version': 1,
       'tenant_id': tenantId,
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
       'generation': generation,
       'database_sha256': checksum,
     });
@@ -47,6 +51,7 @@ class AndroidLocalExportService {
   Future<AndroidExportManifest> verify({
     required File source,
     required String tenantId,
+    String? currentUserId,
     required int serverGeneration,
   }) async {
     final archive = ZipDecoder().decodeBytes(
@@ -69,6 +74,14 @@ class AndroidLocalExportService {
         'Export belongs to another tenant or format.',
       );
     }
+    final ownerUserId = manifest['owner_user_id'] as String?;
+    if (ownerUserId != null &&
+        currentUserId != null &&
+        ownerUserId != currentUserId) {
+      throw StateError(
+        'This backup belongs to another signed-in user account.',
+      );
+    }
     final generation = manifest['generation'] as int;
     if (generation != serverGeneration) {
       throw StateError(
@@ -85,6 +98,7 @@ class AndroidLocalExportService {
       tenantId: tenantId,
       generation: generation,
       checksum: checksum,
+      ownerUserId: manifest['owner_user_id'] as String?,
     );
   }
 }

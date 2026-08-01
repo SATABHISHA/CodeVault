@@ -3,6 +3,8 @@ import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:codevault/core/security/token_store.dart';
 import 'package:codevault/features/authentication/data/remote_auth_service.dart';
 import 'package:codevault/features/authentication/presentation/session_controller.dart';
+import 'package:codevault/features/windows_desktop/application/windows_session.dart';
+import 'package:codevault/platform/windows/data/bootstrap_store.dart';
 import 'package:codevault/shared/widgets/animated_login_background.dart';
 import 'package:codevault/shared/widgets/app_text_field.dart';
 import 'package:dio/dio.dart';
@@ -30,14 +32,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _loadRememberedUsername() async {
-    final saved = await const SecureTokenStore().readKey('cloud_login_username');
-    if (saved != null && saved.isNotEmpty) {
-      if (mounted) {
-        setState(() {
-          login.text = saved;
-          rememberMe = true;
-        });
+    try {
+      final saved = await const SecureTokenStore().readKey(
+        'cloud_login_username',
+      );
+      if (saved != null && saved.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            login.text = saved;
+            rememberMe = true;
+          });
+        }
       }
+    } catch (_) {
+      // Username memory is optional and must not block login UX.
     }
   }
 
@@ -252,11 +260,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             companyName: session.companyName,
             companyAddress: session.companyAddress,
           );
-          
-      if (rememberMe) {
-        await const SecureTokenStore().writeKey('cloud_login_username', login.text.trim());
-      } else {
-        await const SecureTokenStore().writeKey('cloud_login_username', '');
+
+      // Prime in-memory session immediately (safe — no I/O).
+      if (session.tenantId != null) {
+        WindowsSession.companyId = session.tenantId;
+        WindowsSession.companyName = session.companyName;
+        WindowsSession.companyAddress = session.companyAddress;
+        WindowsSession.userId = session.userId;
+        WindowsSession.role = session.role;
+        WindowsSession.permissions = session.permissions;
+        // Persist companyId in bootstrap storage; web/android data lives in
+        // their own local cache DBs after login.
+        _persistCompanyId(session.tenantId!);
+      }
+
+      try {
+        if (rememberMe) {
+          await const SecureTokenStore().writeKey(
+            'cloud_login_username',
+            login.text.trim(),
+          );
+        } else {
+          await const SecureTokenStore().writeKey('cloud_login_username', '');
+        }
+      } catch (_) {
+        // Optional preference storage must not fail sign-in.
       }
 
       if (mounted) {
@@ -285,6 +313,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } finally {
       if (mounted) setState(() => busy = false);
     }
+  }
+
+  /// Persists [companyId] to [BootstrapStore].
+  /// Runs fire-and-forget; failures must not block login.
+  Future<void> _persistCompanyId(String companyId) async {
+    try {
+      await createBootstrapStore().writeCompanyId(companyId);
+    } catch (_) { /* bootstrap store failure is non-fatal */ }
   }
 
   Future<void> _showLoginFailure(String message) => showGeneralDialog<void>(

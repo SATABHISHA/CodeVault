@@ -6,8 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../authentication/presentation/session_controller.dart';
 import '../../labels/application/production_activity.dart';
 import '../../labels/data/local_part_repository.dart';
-import '../../labels/data/web_local_part_repository.dart';
 import '../../labels/data/part_repository.dart';
+import '../../labels/data/web_local_part_repository.dart';
 import '../../sync/data/android_cache_database.dart';
 import '../../windows_desktop/application/windows_session.dart';
 import '../../windows_desktop/data/local_database.dart' show LocalDatabase;
@@ -197,7 +197,7 @@ class _PartsMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeTenant = tenantId ?? (PlatformCapabilities.current().isWindows ? WindowsSession.companyId : 'platform-owner');
+    final activeTenant = tenantId ?? WindowsSession.companyId;
     return FutureBuilder<int>(
       future: activeTenant == null
           ? Future.value(0)

@@ -17,15 +17,18 @@ class BackupManifest {
     required this.schemaVersion,
     required this.createdAt,
     required this.databaseSha256,
+    this.ownerUserId,
   });
   final String companyId;
   final int schemaVersion;
   final DateTime createdAt;
   final String databaseSha256;
+  final String? ownerUserId;
   Map<String, Object> toJson() => {
     'format': 'codevault-backup',
     'format_version': 1,
     'company_id': companyId,
+    if (ownerUserId != null) 'owner_user_id': ownerUserId!,
     'schema_version': schemaVersion,
     'created_at': createdAt.toUtc().toIso8601String(),
     'database_sha256': databaseSha256,
@@ -37,6 +40,7 @@ class LocalBackupService {
 
   Future<BackupManifest> create({
     required String companyId,
+    String? ownerUserId,
     required File database,
     required File destination,
     Directory? assetsDirectory,
@@ -48,6 +52,7 @@ class LocalBackupService {
     final checksum = await _sha256(databaseBytes);
     final manifest = BackupManifest(
       companyId: companyId,
+      ownerUserId: ownerUserId,
       schemaVersion: 1,
       createdAt: DateTime.now(),
       databaseSha256: checksum,
@@ -100,6 +105,7 @@ class LocalBackupService {
       schemaVersion: json['schema_version'] as int,
       createdAt: DateTime.parse(json['created_at'] as String),
       databaseSha256: checksum,
+      ownerUserId: json['owner_user_id'] as String?,
     );
   }
 

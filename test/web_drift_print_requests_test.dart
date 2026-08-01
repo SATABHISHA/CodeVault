@@ -17,7 +17,7 @@ void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 
   test(
-    'web export validates tenant and converts pending drafts to review conflicts',
+    'web export validates tenant and user and converts pending drafts to review conflicts',
     () async {
       final source = AndroidCacheDatabase.forTesting(NativeDatabase.memory());
       final target = AndroidCacheDatabase.forTesting(NativeDatabase.memory());
@@ -47,16 +47,39 @@ void main() {
               idempotencyKey: 'web-draft-1',
             ),
           );
-      final bytes = await WebLocalExportService(source).export('tenant-a', 4);
+      final bytes = await WebLocalExportService(
+        source,
+      ).export('tenant-a', 4, ownerUserId: 'user-a');
       await expectLater(
         WebLocalExportService(
           target,
-        ).import(bytes, tenantId: 'tenant-b', serverGeneration: 4),
+        ).import(
+          bytes,
+          tenantId: 'tenant-b',
+          currentUserId: 'user-a',
+          serverGeneration: 4,
+        ),
         throwsFormatException,
+      );
+      await expectLater(
+        WebLocalExportService(
+          target,
+        ).import(
+          bytes,
+          tenantId: 'tenant-a',
+          currentUserId: 'user-b',
+          serverGeneration: 4,
+        ),
+        throwsStateError,
       );
       final report = await WebLocalExportService(
         target,
-      ).import(bytes, tenantId: 'tenant-a', serverGeneration: 4);
+      ).import(
+        bytes,
+        tenantId: 'tenant-a',
+        currentUserId: 'user-a',
+        serverGeneration: 4,
+      );
       expect(report.cachedParts, 1);
       expect(
         (await target.select(target.syncConflicts).getSingle()).reason,

@@ -8,8 +8,13 @@ import '../../sync/application/web_local_export_service.dart';
 import '../../sync/data/android_cache_database.dart';
 
 class WebCacheTransferCard extends StatefulWidget {
-  const WebCacheTransferCard({required this.tenantId, super.key});
+  const WebCacheTransferCard({
+    required this.tenantId,
+    required this.userId,
+    super.key,
+  });
   final String tenantId;
+  final String userId;
   @override
   State<WebCacheTransferCard> createState() => _WebCacheTransferCardState();
 }
@@ -31,7 +36,7 @@ class _WebCacheTransferCardState extends State<WebCacheTransferCard> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Download this company’s local data, merge missing records without overwriting, or replace this company’s local cache. Files from another company are rejected.',
+            'Download this account-scoped company backup, merge missing records without overwriting, or replace this company’s local cache. Files from another company or another signed-in user are rejected.',
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -82,7 +87,11 @@ class _WebCacheTransferCardState extends State<WebCacheTransferCard> {
     try {
       final bytes = await WebLocalExportService(
         database,
-      ).export(widget.tenantId, await _generation(database));
+      ).export(
+        widget.tenantId,
+        await _generation(database),
+        ownerUserId: widget.userId,
+      );
       final file = XFile.fromData(
         bytes,
         name: 'codevault-${widget.tenantId}.cvbackup',
@@ -134,6 +143,7 @@ class _WebCacheTransferCardState extends State<WebCacheTransferCard> {
       final report = await WebLocalExportService(database).import(
         await file.readAsBytes(),
         tenantId: widget.tenantId,
+        currentUserId: widget.userId,
         serverGeneration: await _generation(database),
         replace: replace,
       );
