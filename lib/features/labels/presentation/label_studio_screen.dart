@@ -17,9 +17,11 @@ import '../../backup/application/backup_import_revision.dart';
 import '../../authentication/presentation/session_controller.dart';
 import '../application/production_activity.dart';
 import '../data/local_part_repository.dart';
+import '../data/label_layout_store.dart';
 import '../data/part_repository.dart';
 import '../data/custom_label_profile_store.dart';
 import '../data/web_local_part_repository.dart';
+import '../domain/label_layout.dart';
 import '../domain/label_typography.dart';
 
 class LabelStudioScreen extends ConsumerStatefulWidget {
@@ -90,6 +92,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   };
   late final Map<String, (double, double)> sizes = {...defaultSizes};
   final customLabelProfileStore = const CustomLabelProfileStore();
+  final labelLayoutStore = const LabelLayoutStore();
+  LabelLayout _labelLayout = LabelLayout.defaults();
   @override
   void initState() {
     super.initState();
@@ -115,6 +119,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     }
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _loadCustomLabelProfiles();
+      await _loadLabelLayout();
       _load();
       _loadPrinters();
       // Initialise stickersPerRow to the calculated max for the default label/code
@@ -329,6 +334,46 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
 
   String _labelSizeName(double width, double height) =>
       '${_dimensionText(width)} × ${_dimensionText(height)} mm';
+
+  Future<void> _loadLabelLayout() async {
+    final identity = _localProfileIdentity;
+    if (identity == null) return;
+    try {
+      final layout = await labelLayoutStore.load(
+        tenantId: identity.$1,
+        userId: identity.$2,
+      );
+      if (!mounted) return;
+      setState(() => _labelLayout = layout);
+    } catch (_) {
+      // Fall back to defaults when local layout cannot be loaded.
+      if (mounted) setState(() => _labelLayout = LabelLayout.defaults());
+    }
+  }
+
+  Future<void> _saveLabelLayout({bool notify = false}) async {
+    final identity = _localProfileIdentity;
+    if (identity == null) {
+      if (notify) {
+        _notice('Please sign in before saving preview layout');
+      }
+      return;
+    }
+    try {
+      await labelLayoutStore.save(
+        tenantId: identity.$1,
+        userId: identity.$2,
+        layout: _labelLayout,
+      );
+      if (notify && mounted) {
+        _notice('Label preview layout saved');
+      }
+    } catch (error) {
+      if (notify && mounted) {
+        _notice('Layout could not be saved: $error');
+      }
+    }
+  }
 
   String _dimensionText(double value) {
     if (value == value.roundToDouble()) return value.toInt().toString();
@@ -839,263 +884,464 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                             labelConstraints.maxHeight * .52,
                             labelConstraints.maxWidth * .20,
                           );
-                          return Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (dualSideCodes &&
-                                    codeSymbology != CodeSymbology.code128)
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        children: [
-                                          SizedBox(
-                                            width: qrSide,
-                                            height: qrSide,
-                                            child: BarcodeView(
-                                              data: codeData,
-                                              symbology: codeSymbology,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.stretch,
-                                              children: [
-                                                // Company — centered
-                                                Text(
-                                                  companyName.text
-                                                          .trim()
-                                                          .isEmpty
-                                                      ? 'COMPANY NAME'
-                                                      : companyName.text
-                                                            .trim()
-                                                            .toUpperCase(),
-                                                  textAlign: TextAlign.center,
-                                                  style: const TextStyle(
-                                                    color: Colors.black,
-                                                    fontFamily: LabelTypography
-                                                        .fontFamily,
-                                                    fontWeight: FontWeight.w900,
-                                                    fontSize: 13,
-                                                    letterSpacing:
-                                                        LabelTypography
-                                                            .companyTracking,
-                                                    height: 1.05,
-                                                  ),
-                                                ),
-                                                // MODEL left  ·  PORT right
-                                                Row(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment
-                                                          .spaceBetween,
-                                                  children: [
-                                                    Text(
-                                                      'MODEL: ${model.text.trim().isEmpty ? '-' : model.text.trim().toUpperCase()}',
-                                                      style: const TextStyle(
-                                                        color: Colors.black,
-                                                        fontFamily:
-                                                            LabelTypography
-                                                                .fontFamily,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 10,
-                                                        letterSpacing:
-                                                            LabelTypography
-                                                                .textTracking,
-                                                        height: 1.15,
-                                                      ),
-                                                    ),
-                                                    if (portLabel.text
-                                                        .trim()
-                                                        .isNotEmpty)
-                                                      Text(
-                                                        portLabel.text
-                                                            .trim()
-                                                            .toUpperCase(),
-                                                        style: const TextStyle(
-                                                          color: Colors.black,
-                                                          fontFamily:
-                                                              LabelTypography
-                                                                  .fontFamily,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          fontSize: 10,
-                                                          letterSpacing:
-                                                              LabelTypography
-                                                                  .textTracking,
-                                                          height: 1.15,
-                                                        ),
-                                                      ),
-                                                  ],
-                                                ),
-                                                // DATE + TIME — left
-                                                Text(
-                                                  'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}    TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
-                                                  textAlign: TextAlign.left,
-                                                  style: const TextStyle(
-                                                    color: Colors.black,
-                                                    fontFamily: LabelTypography
-                                                        .fontFamily,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 10,
-                                                    letterSpacing:
-                                                        LabelTypography
-                                                            .textTracking,
-                                                    height: 1.15,
-                                                  ),
-                                                ),
-                                                // PART NO — left, bold
-                                                Text(
-                                                  'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
-                                                  textAlign: TextAlign.left,
-                                                  style: const TextStyle(
-                                                    color: Colors.black,
-                                                    fontFamily: LabelTypography
-                                                        .fontFamily,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 12,
-                                                    letterSpacing:
-                                                        LabelTypography
-                                                            .textTracking,
-                                                    height: 1.1,
-                                                  ),
-                                                ),
-                                                if (includeName)
-                                                  Text(
-                                                    itemName.text.isEmpty
-                                                        ? '—'
-                                                        : itemName.text,
-                                                    textAlign: TextAlign.left,
-                                                    style: const TextStyle(
-                                                      color: Colors.black,
-                                                      fontFamily:
-                                                          LabelTypography
-                                                              .fontFamily,
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 10,
-                                                      letterSpacing:
-                                                          LabelTypography
-                                                              .textTracking,
-                                                      height: 1.15,
-                                                    ),
-                                                  ),
-                                                Text(
-                                                  codeData,
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                  style: const TextStyle(
-                                                    color: Colors.black,
-                                                    fontFamily: LabelTypography
-                                                        .fontFamily,
-                                                    fontWeight: FontWeight.bold,
-                                                    fontSize: 10,
-                                                    letterSpacing:
-                                                        LabelTypography
-                                                            .textTracking,
-                                                    height: 1.15,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          SizedBox(
-                                            width: qrSide,
-                                            height: qrSide,
-                                            child: BarcodeView(
-                                              data: codeData,
-                                              symbology: codeSymbology,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  )
-                                else ...[
-                                  Text(
-                                    companyName.text.trim().isEmpty
-                                        ? 'COMPANY NAME'
-                                        : companyName.text.trim().toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                  Text(
-                                    companyAddress.text.trim().isEmpty
-                                        ? 'COMPANY ADDRESS'
-                                        : companyAddress.text
-                                              .trim()
-                                              .toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Colors.black54,
-                                      fontSize: 9,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.w800,
-                                    ),
-                                  ),
-                                  if (includeName)
-                                    Text(
-                                      'ITEM: ${itemName.text.isEmpty ? '—' : itemName.text}',
-                                      style: const TextStyle(
-                                        color: Colors.black,
-                                      ),
-                                    ),
-                                  Text(
-                                    portValue.isEmpty
-                                        ? 'MODEL: ${model.text.isEmpty ? '—' : model.text}'
-                                        : 'MODEL: ${model.text.isEmpty ? '—' : model.text}   ${portLabel.text.trim()}',
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 11,
-                                    ),
-                                  ),
-                                  Text(
-                                    'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}   TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  SizedBox(
-                                    height: 105,
-                                    width: double.infinity,
+                          final dualMode =
+                              dualSideCodes &&
+                              codeSymbology != CodeSymbology.code128;
+                          final singleTextWidth = math.max(
+                            100.0,
+                            labelConstraints.maxWidth * .78,
+                          );
+                          final dualCenterWidth = math.max(
+                            70.0,
+                            labelConstraints.maxWidth - (qrSide * 2) - 20,
+                          );
+                          final dualModelWidth = dualCenterWidth * .62;
+                          final dualPortWidth = dualCenterWidth * .34;
+                          final singleLineHeight = math.max(
+                            14.0,
+                            labelConstraints.maxHeight * .08,
+                          );
+                          final dualLineHeight = math.max(
+                            13.0,
+                            labelConstraints.maxHeight * .075,
+                          );
+                          final singleBarcodeHeight = math.min(
+                            105.0,
+                            labelConstraints.maxHeight * .42,
+                          );
+                          final singleBarcodeWidth =
+                              codeSymbology == CodeSymbology.code128
+                              ? labelConstraints.maxWidth * .92
+                              : math.min(
+                                  labelConstraints.maxWidth * .45,
+                                  singleBarcodeHeight,
+                                );
+                          final singleBarcodeSize = Size(
+                            singleBarcodeWidth,
+                            singleBarcodeHeight,
+                          );
+                          final area = Size(
+                            labelConstraints.maxWidth,
+                            labelConstraints.maxHeight,
+                          );
+
+                          return Stack(
+                            clipBehavior: Clip.hardEdge,
+                            children: [
+                              if (dualMode) ...[
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.dualLeftCode,
+                                  elementSize: Size.square(qrSide),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: qrSide,
+                                    height: qrSide,
                                     child: BarcodeView(
                                       data: codeData,
                                       symbology: codeSymbology,
                                     ),
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    codeData,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: 'monospace',
-                                      fontSize: 10,
+                                ),
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.dualCompanyName,
+                                  elementSize: Size(
+                                    dualCenterWidth,
+                                    dualLineHeight,
+                                  ),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: dualCenterWidth,
+                                    child: Text(
+                                      companyName.text.trim().isEmpty
+                                          ? 'COMPANY NAME'
+                                          : companyName.text
+                                                .trim()
+                                                .toUpperCase(),
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: LabelTypography.fontFamily,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 13,
+                                        letterSpacing:
+                                            LabelTypography.companyTracking,
+                                        height: 1.05,
+                                      ),
                                     ),
                                   ),
-                                ],
+                                ),
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.dualModel,
+                                  elementSize: Size(
+                                    dualModelWidth,
+                                    dualLineHeight,
+                                  ),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: dualModelWidth,
+                                    child: Text(
+                                      'MODEL: ${model.text.trim().isEmpty ? '-' : model.text.trim().toUpperCase()}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: LabelTypography.fontFamily,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10,
+                                        letterSpacing:
+                                            LabelTypography.textTracking,
+                                        height: 1.15,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (portLabel.text.trim().isNotEmpty)
+                                  _draggablePreviewFeature(
+                                    area: area,
+                                    element: LabelLayoutElement.dualPort,
+                                    elementSize: Size(
+                                      dualPortWidth,
+                                      dualLineHeight,
+                                    ),
+                                    onChanged: _setLayoutPosition,
+                                    onEnd: _saveLabelLayout,
+                                    child: SizedBox(
+                                      width: dualPortWidth,
+                                      child: Text(
+                                        portLabel.text.trim().toUpperCase(),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.black,
+                                          fontFamily:
+                                              LabelTypography.fontFamily,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10,
+                                          letterSpacing:
+                                              LabelTypography.textTracking,
+                                          height: 1.15,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.dualDateTime,
+                                  elementSize: Size(
+                                    dualCenterWidth,
+                                    dualLineHeight,
+                                  ),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: dualCenterWidth,
+                                    child: Text(
+                                      'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}    TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: LabelTypography.fontFamily,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10,
+                                        letterSpacing:
+                                            LabelTypography.textTracking,
+                                        height: 1.15,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.dualPartNumber,
+                                  elementSize: Size(
+                                    dualCenterWidth,
+                                    dualLineHeight,
+                                  ),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: dualCenterWidth,
+                                    child: Text(
+                                      'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: LabelTypography.fontFamily,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                        letterSpacing:
+                                            LabelTypography.textTracking,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (includeName)
+                                  _draggablePreviewFeature(
+                                    area: area,
+                                    element: LabelLayoutElement.dualItemName,
+                                    elementSize: Size(
+                                      dualCenterWidth,
+                                      dualLineHeight,
+                                    ),
+                                    onChanged: _setLayoutPosition,
+                                    onEnd: _saveLabelLayout,
+                                    child: SizedBox(
+                                      width: dualCenterWidth,
+                                      child: Text(
+                                        itemName.text.isEmpty
+                                            ? '—'
+                                            : itemName.text,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.black,
+                                          fontFamily:
+                                              LabelTypography.fontFamily,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 10,
+                                          letterSpacing:
+                                              LabelTypography.textTracking,
+                                          height: 1.15,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.dualCodeData,
+                                  elementSize: Size(
+                                    dualCenterWidth,
+                                    dualLineHeight,
+                                  ),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: dualCenterWidth,
+                                    child: Text(
+                                      codeData,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: LabelTypography.fontFamily,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10,
+                                        letterSpacing:
+                                            LabelTypography.textTracking,
+                                        height: 1.15,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.dualRightCode,
+                                  elementSize: Size.square(qrSide),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: qrSide,
+                                    height: qrSide,
+                                    child: BarcodeView(
+                                      data: codeData,
+                                      symbology: codeSymbology,
+                                    ),
+                                  ),
+                                ),
+                              ] else ...[
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.singleCompanyName,
+                                  elementSize: Size(
+                                    singleTextWidth,
+                                    singleLineHeight,
+                                  ),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: singleTextWidth,
+                                    child: Text(
+                                      companyName.text.trim().isEmpty
+                                          ? 'COMPANY NAME'
+                                          : companyName.text
+                                                .trim()
+                                                .toUpperCase(),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element:
+                                      LabelLayoutElement.singleCompanyAddress,
+                                  elementSize: Size(
+                                    singleTextWidth,
+                                    singleLineHeight,
+                                  ),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: singleTextWidth,
+                                    child: Text(
+                                      companyAddress.text.trim().isEmpty
+                                          ? 'COMPANY ADDRESS'
+                                          : companyAddress.text
+                                                .trim()
+                                                .toUpperCase(),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.black54,
+                                        fontSize: 9,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.singlePartNumber,
+                                  elementSize: Size(
+                                    singleTextWidth,
+                                    singleLineHeight,
+                                  ),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: singleTextWidth,
+                                    child: Text(
+                                      'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (includeName)
+                                  _draggablePreviewFeature(
+                                    area: area,
+                                    element: LabelLayoutElement.singleItemName,
+                                    elementSize: Size(
+                                      singleTextWidth,
+                                      singleLineHeight,
+                                    ),
+                                    onChanged: _setLayoutPosition,
+                                    onEnd: _saveLabelLayout,
+                                    child: SizedBox(
+                                      width: singleTextWidth,
+                                      child: Text(
+                                        'ITEM: ${itemName.text.isEmpty ? '—' : itemName.text}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.singleModelPort,
+                                  elementSize: Size(
+                                    singleTextWidth,
+                                    singleLineHeight,
+                                  ),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: singleTextWidth,
+                                    child: Text(
+                                      portValue.isEmpty
+                                          ? 'MODEL: ${model.text.isEmpty ? '—' : model.text}'
+                                          : 'MODEL: ${model.text.isEmpty ? '—' : model.text}   ${portLabel.text.trim()}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.singleDateTime,
+                                  elementSize: Size(
+                                    singleTextWidth,
+                                    singleLineHeight,
+                                  ),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: singleTextWidth,
+                                    child: Text(
+                                      'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}   TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.singleBarcode,
+                                  elementSize: singleBarcodeSize,
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    height: singleBarcodeSize.height,
+                                    width: singleBarcodeSize.width,
+                                    child: BarcodeView(
+                                      data: codeData,
+                                      symbology: codeSymbology,
+                                    ),
+                                  ),
+                                ),
+                                _draggablePreviewFeature(
+                                  area: area,
+                                  element: LabelLayoutElement.singleCodeData,
+                                  elementSize: Size(
+                                    singleTextWidth,
+                                    singleLineHeight,
+                                  ),
+                                  onChanged: _setLayoutPosition,
+                                  onEnd: _saveLabelLayout,
+                                  child: SizedBox(
+                                    width: singleTextWidth,
+                                    child: Text(
+                                      codeData,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: 'monospace',
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ],
-                            ),
+                            ],
                           );
                         },
                       ),
@@ -1116,6 +1362,11 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
             runSpacing: 10,
             alignment: WrapAlignment.end,
             children: [
+              OutlinedButton.icon(
+                onPressed: busy ? null : () => _saveLabelLayout(notify: true),
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('Save layout'),
+              ),
               OutlinedButton.icon(
                 onPressed: busy ? null : () => _generate(),
                 icon: const Icon(Icons.visibility_outlined),
@@ -1179,6 +1430,56 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       ),
     ),
   );
+
+  void _setLayoutPosition(
+    LabelLayoutElement element,
+    LabelLayoutPosition position,
+  ) {
+    setState(() {
+      _labelLayout = _labelLayout.copyWithElement(element, position);
+    });
+  }
+
+  Widget _draggablePreviewFeature({
+    required Size area,
+    required LabelLayoutElement element,
+    required Size elementSize,
+    required void Function(LabelLayoutElement, LabelLayoutPosition) onChanged,
+    required Future<void> Function({bool notify}) onEnd,
+    required Widget child,
+  }) {
+    final freeX = math.max(0.0, area.width - elementSize.width);
+    final freeY = math.max(0.0, area.height - elementSize.height);
+    final normalized = _labelLayout.positionFor(element);
+    final left = freeX * normalized.x;
+    final top = freeY * normalized.y;
+
+    return Positioned(
+      left: left,
+      top: top,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.grab,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onPanUpdate: (details) {
+            final nextLeft = (left + details.delta.dx).clamp(0.0, freeX);
+            final nextTop = (top + details.delta.dy).clamp(0.0, freeY);
+            onChanged(
+              element,
+              LabelLayoutPosition(
+                x: freeX <= 0 ? 0 : nextLeft / freeX,
+                y: freeY <= 0 ? 0 : nextTop / freeY,
+              ),
+            );
+          },
+          onPanEnd: (_) {
+            onEnd();
+          },
+          child: child,
+        ),
+      ),
+    );
+  }
 
   Widget _field(
     TextEditingController controller,
@@ -1376,6 +1677,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       packQty: int.tryParse(pack.text) ?? 1,
       stickersPerRow: stickersPerRow,
       includeBorder: includeBorder,
+      layout: _labelLayout,
     );
   }
 
