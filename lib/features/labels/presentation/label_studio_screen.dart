@@ -22,6 +22,7 @@ import '../data/part_repository.dart';
 import '../data/custom_label_profile_store.dart';
 import '../data/web_local_part_repository.dart';
 import '../domain/label_field_config.dart';
+import '../domain/dynamic_label_field.dart';
 import '../domain/label_layout.dart';
 import '../domain/label_typography.dart';
 
@@ -97,6 +98,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   LabelLayout _labelLayout = LabelLayout.defaults();
   Map<LabelFieldKey, LabelFieldSetting> _labelFieldSettings =
       LabelFieldConfig.defaults();
+  List<DynamicLabelField> _dynamicFields = const [];
+  final Map<LabelLayoutElement, LabelLayoutRect> _previewElementRects = {};
+  final Map<String, LabelLayoutRect> _previewDynamicRects = {};
+  double? _previewCanvasHeight;
   @override
   void initState() {
     super.initState();
@@ -579,6 +584,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
           ],
         ),
         const SizedBox(height: 12),
+        _dynamicFieldsEditor(context),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(child: _field(dr, 'DR code', Icons.qr_code)),
@@ -912,6 +919,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                       ),
                       child: LayoutBuilder(
                         builder: (context, labelConstraints) {
+                          _previewCanvasHeight = labelConstraints.maxHeight;
+                          _previewElementRects.clear();
+                          _previewDynamicRects.clear();
                           final qrSide = math.min(
                             labelConstraints.maxHeight * .52,
                             labelConstraints.maxWidth * .20,
@@ -1401,6 +1411,52 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     ),
                                   ),
                               ],
+                              for (final field in _dynamicFields)
+                                if (field.visible &&
+                                    field.value.trim().isNotEmpty)
+                                  _draggablePositionedFeature(
+                                    area: area,
+                                    elementSize: Size(
+                                      dualMode
+                                          ? dualCenterWidth
+                                          : singleTextWidth,
+                                      dualMode
+                                          ? dualLineHeight
+                                          : singleLineHeight,
+                                    ),
+                                    currentPosition: () {
+                                      final current = _dynamicFields.firstWhere(
+                                        (candidate) => candidate.id == field.id,
+                                      );
+                                      return LabelLayoutPosition(
+                                        x: current.x,
+                                        y: current.y,
+                                      );
+                                    },
+                                    onChanged: (position) =>
+                                        _updateDynamicField(
+                                          field.id,
+                                          (current) => current.copyWith(
+                                            x: position.x,
+                                            y: position.y,
+                                          ),
+                                        ),
+                                    onEnd: () {},
+                                    onGeometry: (rect) =>
+                                        _previewDynamicRects[field.id] = rect,
+                                    child: Text(
+                                      '${field.label}: ${field.value}',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontFamily: LabelTypography.fontFamily,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: field.fontSize,
+                                        height: 1.1,
+                                      ),
+                                    ),
+                                  ),
                             ],
                           );
                         },
@@ -1513,11 +1569,41 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     required Future<void> Function({bool notify}) onEnd,
     required Widget child,
   }) {
+    return _draggablePositionedFeature(
+      area: area,
+      elementSize: elementSize,
+      currentPosition: () => _labelLayout.positionFor(element),
+      onChanged: (position) => onChanged(element, position),
+      onEnd: () => onEnd(),
+      onGeometry: (rect) => _previewElementRects[element] = rect,
+      child: child,
+    );
+  }
+
+  Widget _draggablePositionedFeature({
+    required Size area,
+    required Size elementSize,
+    required LabelLayoutPosition Function() currentPosition,
+    required ValueChanged<LabelLayoutPosition> onChanged,
+    required VoidCallback onEnd,
+    ValueChanged<LabelLayoutRect>? onGeometry,
+    required Widget child,
+  }) {
     final freeX = math.max(0.0, area.width - elementSize.width);
     final freeY = math.max(0.0, area.height - elementSize.height);
-    final normalized = _labelLayout.positionFor(element);
+    final maxLeft = math.max(0.0, area.width - 8.0);
+    final maxNormalizedX = freeX <= 0 ? 0.0 : maxLeft / freeX;
+    final normalized = currentPosition();
     final left = freeX * normalized.x;
     final top = freeY * normalized.y;
+    onGeometry?.call(
+      LabelLayoutRect(
+        left: area.width <= 0 ? 0 : left / area.width,
+        top: area.height <= 0 ? 0 : top / area.height,
+        width: area.width <= 0 ? 0 : elementSize.width / area.width,
+        height: area.height <= 0 ? 0 : elementSize.height / area.height,
+      ),
+    );
 
     return Positioned(
       left: left,
@@ -1527,20 +1613,27 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onPanUpdate: (details) {
-            final nextLeft = (left + details.delta.dx).clamp(0.0, freeX);
-            final nextTop = (top + details.delta.dy).clamp(0.0, freeY);
+            final current = currentPosition();
             onChanged(
-              element,
               LabelLayoutPosition(
-                x: freeX <= 0 ? 0 : nextLeft / freeX,
-                y: freeY <= 0 ? 0 : nextTop / freeY,
+                x: freeX <= 0
+                    ? 0
+                    : (current.x + (details.delta.dx / freeX)).clamp(
+                        0.0,
+                        maxNormalizedX,
+                      ),
+                y: freeY <= 0
+                    ? 0
+                    : (current.y + (details.delta.dy / freeY)).clamp(0.0, 1.0),
               ),
             );
           },
-          onPanEnd: (_) {
-            onEnd();
-          },
-          child: child,
+          onPanEnd: (_) => onEnd(),
+          child: SizedBox(
+            width: elementSize.width,
+            height: elementSize.height,
+            child: child,
+          ),
         ),
       ),
     );
@@ -1611,6 +1704,193 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       };
     });
   }
+
+  Future<void> _addDynamicField() async {
+    final label = TextEditingController();
+    final value = TextEditingController();
+    final result = await showDialog<(String, String)>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add dynamic field'),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: label,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Field name'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: value,
+                decoration: const InputDecoration(labelText: 'Field value'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (label.text.trim().isEmpty) return;
+              Navigator.pop(dialogContext, (label.text.trim(), value.text));
+            },
+            child: const Text('Add'),
+          ),
+        ],
+      ),
+    );
+    label.dispose();
+    value.dispose();
+    if (result == null || !mounted) return;
+    setState(() {
+      _dynamicFields = [
+        ..._dynamicFields,
+        DynamicLabelField(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          label: result.$1,
+          value: result.$2,
+          y: (.74 + (_dynamicFields.length * .075)).clamp(0.0, 1.0),
+        ),
+      ];
+    });
+  }
+
+  void _updateDynamicField(
+    String id,
+    DynamicLabelField Function(DynamicLabelField field) update,
+  ) {
+    setState(() {
+      _dynamicFields = [
+        for (final field in _dynamicFields)
+          if (field.id == id) update(field) else field,
+      ];
+    });
+  }
+
+  Widget _dynamicFieldsEditor(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Column(
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.dynamic_form),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Dynamic fields',
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+            ),
+            FilledButton.tonalIcon(
+              key: const Key('add-dynamic-field'),
+              onPressed: busy ? null : _addDynamicField,
+              icon: const Icon(Icons.add),
+              label: const Text('Add field'),
+            ),
+          ],
+        ),
+        if (_dynamicFields.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 12),
+            child: Text('No custom fields added for this part.'),
+          ),
+        for (final field in _dynamicFields) ...[
+          const SizedBox(height: 12),
+          Card(
+            margin: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          key: ValueKey('dynamic-label-${field.id}'),
+                          initialValue: field.label,
+                          decoration: const InputDecoration(
+                            labelText: 'Field name',
+                          ),
+                          onChanged: (text) => _updateDynamicField(
+                            field.id,
+                            (current) => current.copyWith(label: text),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextFormField(
+                          key: ValueKey('dynamic-value-${field.id}'),
+                          initialValue: field.value,
+                          decoration: const InputDecoration(
+                            labelText: 'Field value',
+                          ),
+                          onChanged: (text) => _updateDynamicField(
+                            field.id,
+                            (current) => current.copyWith(value: text),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Delete field',
+                        onPressed: () => setState(
+                          () => _dynamicFields = _dynamicFields
+                              .where((item) => item.id != field.id)
+                              .toList(),
+                        ),
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      const Text('Show on label'),
+                      Switch.adaptive(
+                        value: field.visible,
+                        onChanged: (visible) => _updateDynamicField(
+                          field.id,
+                          (current) => current.copyWith(visible: visible),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('${field.fontSize.toStringAsFixed(0)} pt'),
+                      Expanded(
+                        child: Slider.adaptive(
+                          value: field.fontSize,
+                          min: LabelFieldConfig.minFontSize,
+                          max: LabelFieldConfig.maxFontSize,
+                          divisions:
+                              (LabelFieldConfig.maxFontSize -
+                                      LabelFieldConfig.minFontSize)
+                                  .toInt(),
+                          onChanged: (size) => _updateDynamicField(
+                            field.id,
+                            (current) => current.copyWith(fontSize: size),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
 
   Widget _stickerFieldSection(BuildContext context) {
     final controls =
@@ -1898,6 +2178,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     'label_company_name': companyName.text.trim(),
     'label_company_address': companyAddress.text.trim(),
     'label_field_config': LabelFieldConfig.toJsonObject(_labelFieldSettings),
+    'dynamic_label_fields': DynamicLabelField.listToJson(_dynamicFields),
     'is_active': true,
   };
 
@@ -1956,6 +2237,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     _labelFieldSettings = LabelFieldConfig.mergeWithDefaults(
       part.labelFieldSettings,
     );
+    _dynamicFields = List.of(part.dynamicFields);
     includeName = _isVisible(LabelFieldKey.itemName);
     message = '${part.number} selected';
   });
@@ -2056,6 +2338,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       includeBorder: includeBorder,
       layout: _labelLayout,
       fieldSettings: _labelFieldSettings,
+      dynamicFields: _dynamicFields,
+      resolvedLayoutRects: Map.of(_previewElementRects),
+      resolvedDynamicRects: Map.of(_previewDynamicRects),
+      previewCanvasHeight: _previewCanvasHeight,
     );
   }
 
@@ -2125,6 +2411,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     pack.text = '1';
     quantity.text = '1';
     _labelFieldSettings = LabelFieldConfig.defaults();
+    _dynamicFields = const [];
     includeName = _isVisible(LabelFieldKey.itemName);
     companyName.text = WindowsSession.companyName;
     companyAddress.text = WindowsSession.companyAddress;

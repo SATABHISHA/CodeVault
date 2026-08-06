@@ -1,5 +1,6 @@
 import '../../../core/network/api_client.dart';
 import '../domain/label_field_config.dart';
+import '../domain/dynamic_label_field.dart';
 
 class PartRecord {
   PartRecord({
@@ -14,9 +15,11 @@ class PartRecord {
     this.labelCompanyName = '',
     this.labelCompanyAddress = '',
     Map<LabelFieldKey, LabelFieldSetting>? labelFieldSettings,
+    List<DynamicLabelField>? dynamicFields,
   }) : labelFieldSettings = LabelFieldConfig.mergeWithDefaults(
          labelFieldSettings,
-       );
+       ),
+       dynamicFields = List.unmodifiable(dynamicFields ?? const []);
 
   factory PartRecord.fromJson(Map<String, dynamic> json) {
     final dynamic configValue =
@@ -39,6 +42,9 @@ class PartRecord {
           json['company_address'] as String? ??
           '',
       labelFieldSettings: LabelFieldConfig.fromDynamic(configValue),
+      dynamicFields: DynamicLabelField.listFromDynamic(
+        json['dynamic_label_fields'],
+      ),
     );
   }
 
@@ -53,6 +59,7 @@ class PartRecord {
   final String labelCompanyName;
   final String labelCompanyAddress;
   final Map<LabelFieldKey, LabelFieldSetting> labelFieldSettings;
+  final List<DynamicLabelField> dynamicFields;
 }
 
 /// Abstract interface — implemented by [CloudPartRepository] (web/mobile) and

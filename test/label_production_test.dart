@@ -1,4 +1,6 @@
 import 'package:codevault/features/printers/domain/browser_printing.dart';
+import 'package:codevault/features/labels/domain/dynamic_label_field.dart';
+import 'package:codevault/features/labels/domain/label_layout.dart';
 import 'package:codevault/shared/widgets/barcode_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -47,6 +49,71 @@ void main() {
       );
       expect(bytes.take(4), equals('%PDF'.codeUnits), reason: '$size');
     }
+  });
+
+  test('dynamic label fields round-trip and render in the PDF', () async {
+    const fields = [
+      DynamicLabelField(
+        id: 'batch',
+        label: 'Batch',
+        value: 'B-2608',
+        fontSize: 12,
+        x: .62,
+        y: .35,
+      ),
+      DynamicLabelField(
+        id: 'hidden',
+        label: 'Internal',
+        value: 'SECRET',
+        visible: false,
+      ),
+    ];
+    final restored = DynamicLabelField.listFromDynamic(
+      DynamicLabelField.listToJson(fields),
+    );
+    expect(restored, hasLength(2));
+    expect(restored.first.label, 'Batch');
+    expect(restored.first.fontSize, 12);
+    expect(restored.first.x, .62);
+    expect(restored.first.y, .35);
+    expect(restored.last.visible, isFalse);
+
+    final bytes = await const BrowserPdfGenerator().generate(
+      const BrowserLabelDocument(
+        title: 'PART NO: P-1',
+        content: 'P-1-B-2608',
+        widthMm: 100,
+        heightMm: 30,
+        symbology: 'data_matrix',
+        dualSideCodes: true,
+        dynamicFields: fields,
+        previewCanvasHeight: 180,
+        resolvedLayoutRects: {
+          LabelLayoutElement.dualLeftCode: LabelLayoutRect(
+            left: .02,
+            top: .2,
+            width: .16,
+            height: .52,
+          ),
+          LabelLayoutElement.dualCompanyName: LabelLayoutRect(
+            left: .35,
+            top: .04,
+            width: .3,
+            height: .08,
+          ),
+        },
+        resolvedDynamicRects: {
+          'batch': LabelLayoutRect(left: .7, top: .3, width: .25, height: .08),
+        },
+      ),
+    );
+    expect(bytes.take(4), equals('%PDF'.codeUnits));
+  });
+
+  test('layout positions preserve extended horizontal dragging', () {
+    const position = LabelLayoutPosition(x: 1.75, y: .5);
+    expect(position.clamp().x, 1.75);
+    expect(position.clamp().y, .5);
   });
 
   testWidgets('live code preview paints every supported symbology', (

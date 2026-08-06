@@ -7,6 +7,7 @@ import 'package:barcode/barcode.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
 import '../../labels/domain/label_field_config.dart';
+import '../../labels/domain/dynamic_label_field.dart';
 import '../../labels/domain/label_layout.dart';
 import '../../labels/domain/label_typography.dart';
 
@@ -31,6 +32,10 @@ class BrowserLabelDocument {
     this.includeBorder = true,
     this.layout,
     this.fieldSettings,
+    this.dynamicFields = const [],
+    this.resolvedLayoutRects = const {},
+    this.resolvedDynamicRects = const {},
+    this.previewCanvasHeight,
   });
   final String title;
   final String content;
@@ -51,6 +56,10 @@ class BrowserLabelDocument {
   final bool includeBorder;
   final LabelLayout? layout;
   final Map<LabelFieldKey, LabelFieldSetting>? fieldSettings;
+  final List<DynamicLabelField> dynamicFields;
+  final Map<LabelLayoutElement, LabelLayoutRect> resolvedLayoutRects;
+  final Map<String, LabelLayoutRect> resolvedDynamicRects;
+  final double? previewCanvasHeight;
 }
 
 class BrowserPdfGenerator {
@@ -81,10 +90,18 @@ class BrowserPdfGenerator {
     // How many sticker rows fit on one A4 page?
     final rowsPerPage = (a4H / hPt).floor().clamp(1, 9999);
 
+    // Match preview proportions: keep inner canvas relatively large.
+    final pad = (math.min(wPt, hPt) * 0.06).clamp(1.2, 4.0);
+    final innerW = wPt - pad * 2;
+    final innerH = hPt - pad * 2;
+
     // ── Dynamic font scaling based on label height ───────────────────────────
     // Scale fonts so they retain the same proportions as the live preview.
     // The configured values are preview pixels, not typographic points.
-    final fontScale = (label.heightMm / 30.0).clamp(0.5, 2.0) * 0.6;
+    final fontScale =
+        label.previewCanvasHeight != null && label.previewCanvasHeight! > 0
+        ? innerH / label.previewCanvasHeight!
+        : (label.heightMm / 30.0).clamp(0.5, 2.0) * 0.6;
     final settings = LabelFieldConfig.mergeWithDefaults(label.fieldSettings);
     bool visible(LabelFieldKey key) => settings[key]!.visible;
     double scaledFont(
@@ -102,11 +119,6 @@ class BrowserPdfGenerator {
     final fDateTime = scaledFont(LabelFieldKey.dateTime);
     final fContent = scaledFont(LabelFieldKey.codeData);
 
-    // Match preview proportions: keep inner canvas relatively large.
-    final pad = (math.min(wPt, hPt) * 0.06).clamp(1.2, 4.0);
-
-    final innerW = wPt - pad * 2;
-    final innerH = hPt - pad * 2;
     // Use the same geometry intent as live preview.
     final twinSide = math.max(8.0, math.min(innerH * 0.52, innerW * 0.20));
     final centerW = (innerW - (twinSide * 2) - (innerW * 0.04)).clamp(
@@ -163,6 +175,18 @@ class BrowserPdfGenerator {
       required double height,
       required pw.Widget child,
     }) {
+      final rect = label.resolvedLayoutRects[element];
+      if (rect != null) {
+        return pw.Positioned(
+          left: innerW * rect.left,
+          top: innerH * rect.top,
+          child: pw.SizedBox(
+            width: innerW * rect.width,
+            height: innerH * rect.height,
+            child: child,
+          ),
+        );
+      }
       final normalized = resolvedLayout.positionFor(element);
       final freeW = math.max(0.0, innerW - width);
       final freeH = math.max(0.0, innerH - height);
@@ -170,6 +194,35 @@ class BrowserPdfGenerator {
         left: freeW * normalized.x,
         top: freeH * normalized.y,
         child: pw.SizedBox(width: width, height: height, child: child),
+      );
+    }
+
+    pw.Widget positionedDynamicField(DynamicLabelField field) {
+      final rect = label.resolvedDynamicRects[field.id];
+      final width = rect == null
+          ? (twinCodes ? centerW : singleTextW)
+          : innerW * rect.width;
+      final height = rect == null
+          ? (twinCodes ? dualLineH : singleLineH)
+          : innerH * rect.height;
+      return pw.Positioned(
+        left: rect == null ? (innerW - width) * field.x : innerW * rect.left,
+        top: rect == null ? (innerH - height) * field.y : innerH * rect.top,
+        child: pw.SizedBox(
+          width: width,
+          height: height,
+          child: pw.Text(
+            '${field.label}: ${field.value}',
+            maxLines: 1,
+            overflow: pw.TextOverflow.clip,
+            style: pw.TextStyle(
+              font: labelFont,
+              fontWeight: pw.FontWeight.bold,
+              fontSize: (field.fontSize * fontScale).clamp(2.0, 14.0),
+              letterSpacing: LabelTypography.textTracking,
+            ),
+          ),
+        ),
       );
     }
 
@@ -437,6 +490,9 @@ class BrowserPdfGenerator {
                   ),
                 ),
             ],
+            for (final field in label.dynamicFields)
+              if (field.visible && field.value.trim().isNotEmpty)
+                positionedDynamicField(field),
           ],
         ),
       ), // Container

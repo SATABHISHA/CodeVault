@@ -20,6 +20,20 @@ enum LabelLayoutElement {
   dualRightCode,
 }
 
+class LabelLayoutRect {
+  const LabelLayoutRect({
+    required this.left,
+    required this.top,
+    required this.width,
+    required this.height,
+  });
+
+  final double left;
+  final double top;
+  final double width;
+  final double height;
+}
+
 class LabelLayoutPosition {
   const LabelLayoutPosition({required this.x, required this.y});
 
@@ -27,7 +41,9 @@ class LabelLayoutPosition {
   final double y;
 
   LabelLayoutPosition clamp() =>
-      LabelLayoutPosition(x: x.clamp(0.0, 1.0), y: y.clamp(0.0, 1.0));
+      // X may exceed 1 when a wide text box is dragged beyond its traditional
+      // free-space boundary. The preview/PDF clip the box at the label edge.
+      LabelLayoutPosition(x: x.clamp(0.0, 20.0), y: y.clamp(0.0, 1.0));
 
   Map<String, double> toJson() => {'x': x, 'y': y};
 
