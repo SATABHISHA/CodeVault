@@ -1,7 +1,8 @@
 import '../../../core/network/api_client.dart';
+import '../domain/label_field_config.dart';
 
 class PartRecord {
-  const PartRecord({
+  PartRecord({
     required this.id,
     required this.number,
     required this.name,
@@ -12,26 +13,34 @@ class PartRecord {
     required this.version,
     this.labelCompanyName = '',
     this.labelCompanyAddress = '',
-  });
+    Map<LabelFieldKey, LabelFieldSetting>? labelFieldSettings,
+  }) : labelFieldSettings = LabelFieldConfig.mergeWithDefaults(
+         labelFieldSettings,
+       );
 
-  factory PartRecord.fromJson(Map<String, dynamic> json) => PartRecord(
-    id: json['id'] as String,
-    number: json['part_number'] as String,
-    name: json['item_name'] as String,
-    model: json['item_model'] as String? ?? '',
-    drCode: json['default_dr_code'] as String? ?? '',
-    packQuantity: json['default_pack_quantity'] as int? ?? 1,
-    barcodeType: json['barcode_type'] as String? ?? 'code128',
-    version: json['version'] as int? ?? 1,
-    labelCompanyName:
-        json['label_company_name'] as String? ??
-        json['company_name'] as String? ??
-        '',
-    labelCompanyAddress:
-        json['label_company_address'] as String? ??
-        json['company_address'] as String? ??
-        '',
-  );
+  factory PartRecord.fromJson(Map<String, dynamic> json) {
+    final dynamic configValue =
+        json['label_field_config'] ?? json['label_config'];
+    return PartRecord(
+      id: json['id'] as String,
+      number: json['part_number'] as String,
+      name: json['item_name'] as String,
+      model: json['item_model'] as String? ?? '',
+      drCode: json['default_dr_code'] as String? ?? '',
+      packQuantity: json['default_pack_quantity'] as int? ?? 1,
+      barcodeType: json['barcode_type'] as String? ?? 'code128',
+      version: json['version'] as int? ?? 1,
+      labelCompanyName:
+          json['label_company_name'] as String? ??
+          json['company_name'] as String? ??
+          '',
+      labelCompanyAddress:
+          json['label_company_address'] as String? ??
+          json['company_address'] as String? ??
+          '',
+      labelFieldSettings: LabelFieldConfig.fromDynamic(configValue),
+    );
+  }
 
   final String id;
   final String number;
@@ -43,6 +52,7 @@ class PartRecord {
   final int version;
   final String labelCompanyName;
   final String labelCompanyAddress;
+  final Map<LabelFieldKey, LabelFieldSetting> labelFieldSettings;
 }
 
 /// Abstract interface — implemented by [CloudPartRepository] (web/mobile) and

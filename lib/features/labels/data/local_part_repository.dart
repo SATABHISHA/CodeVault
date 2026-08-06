@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
+import '../domain/label_field_config.dart';
 import '../../windows_desktop/data/local_database.dart';
 import 'part_repository.dart';
 
@@ -9,10 +10,13 @@ import 'part_repository.dart';
 class LocalPartRepository implements PartRepository {
   LocalPartRepository(this._db);
   final LocalDatabase _db;
+  static const _labelFieldConfigPrefix = 'part-label-config:';
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
-  PartRecord _fromRow(Part row) => PartRecord(
+  String _configKey(String partId) => '$_labelFieldConfigPrefix$partId';
+
+  PartRecord _fromRow(Part row, {String? configJson}) => PartRecord(
     id: row.id,
     number: row.description ?? row.id, // description stores the part number
     name: row.item,
@@ -23,7 +27,51 @@ class LocalPartRepository implements PartRepository {
     version: 1,
     labelCompanyName: row.labelCompanyName ?? '',
     labelCompanyAddress: row.labelCompanyAddress ?? '',
+    labelFieldSettings: LabelFieldConfig.fromEncodedJson(configJson),
   );
+
+  Future<Map<String, String>> _loadConfigsByPartIds(
+    String tenantId,
+    Iterable<String> partIds,
+  ) async {
+    final scoped = partIds.toSet();
+    if (scoped.isEmpty) return const {};
+    final rows =
+        await (_db.select(_db.localSettings)..where(
+              (t) =>
+                  t.companyId.equals(tenantId) &
+                  t.key.like('$_labelFieldConfigPrefix%'),
+            ))
+            .get();
+    final result = <String, String>{};
+    for (final row in rows) {
+      if (!row.key.startsWith(_labelFieldConfigPrefix)) continue;
+      final partId = row.key.substring(_labelFieldConfigPrefix.length);
+      if (scoped.contains(partId)) {
+        result[partId] = row.value;
+      }
+    }
+    return result;
+  }
+
+  Future<void> _saveLabelFieldConfig(
+    String tenantId,
+    String partId,
+    Object? rawConfig,
+  ) {
+    final encoded = LabelFieldConfig.toEncodedJson(
+      LabelFieldConfig.fromDynamic(rawConfig),
+    );
+    return _db
+        .into(_db.localSettings)
+        .insertOnConflictUpdate(
+          LocalSettingsCompanion.insert(
+            companyId: tenantId,
+            key: _configKey(partId),
+            value: encoded,
+          ),
+        );
+  }
 
   // ── interface ─────────────────────────────────────────────────────────────
 
@@ -37,7 +85,13 @@ class LocalPartRepository implements PartRepository {
     }
 
     final rows = await query.get();
-    return rows.map(_fromRow).toList();
+    final configs = await _loadConfigsByPartIds(
+      tenantId,
+      rows.map((row) => row.id),
+    );
+    return rows
+        .map((row) => _fromRow(row, configJson: configs[row.id]))
+        .toList();
   }
 
   @override
@@ -65,10 +119,17 @@ class LocalPartRepository implements PartRepository {
             active: const Value(true),
           ),
         );
+    await _saveLabelFieldConfig(tenantId, id, data['label_field_config']);
     final row = await (_db.select(
       _db.parts,
     )..where((t) => t.id.equals(id))).getSingle();
-    return _fromRow(row);
+    final config =
+        await (_db.select(_db.localSettings)..where(
+              (t) =>
+                  t.companyId.equals(tenantId) & t.key.equals(_configKey(id)),
+            ))
+            .getSingleOrNull();
+    return _fromRow(row, configJson: config?.value);
   }
 
   @override
@@ -103,16 +164,28 @@ class LocalPartRepository implements PartRepository {
     if (changed != 1) {
       throw StateError('The selected part no longer exists in this company.');
     }
+    await _saveLabelFieldConfig(tenantId, part.id, data['label_field_config']);
     final row =
         await (_db.select(_db.parts)..where(
               (t) => t.companyId.equals(tenantId) & t.id.equals(part.id),
             ))
             .getSingle();
-    return _fromRow(row);
+    final config =
+        await (_db.select(_db.localSettings)..where(
+              (t) =>
+                  t.companyId.equals(tenantId) &
+                  t.key.equals(_configKey(part.id)),
+            ))
+            .getSingleOrNull();
+    return _fromRow(row, configJson: config?.value);
   }
 
   @override
   Future<void> delete(String tenantId, String id) async {
     await (_db.delete(_db.parts)..where((t) => t.id.equals(id))).go();
+    await (_db.delete(_db.localSettings)..where(
+          (t) => t.companyId.equals(tenantId) & t.key.equals(_configKey(id)),
+        ))
+        .go();
   }
 }

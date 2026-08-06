@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:flutter/foundation.dart';
 import '../../sync/data/android_cache_database.dart';
+import '../domain/label_field_config.dart';
 import 'part_repository.dart';
 
 class WebLocalPartRepository implements PartRepository {
@@ -30,6 +31,9 @@ class WebLocalPartRepository implements PartRepository {
       version: row.serverVersion,
       labelCompanyName: payload['label_company_name'] as String? ?? '',
       labelCompanyAddress: payload['label_company_address'] as String? ?? '',
+      labelFieldSettings: LabelFieldConfig.fromDynamic(
+        payload['label_field_config'],
+      ),
     );
   }
 
@@ -73,6 +77,7 @@ class WebLocalPartRepository implements PartRepository {
       'barcode_type': data['barcode_type'],
       'label_company_name': data['label_company_name'],
       'label_company_address': data['label_company_address'],
+      'label_field_config': data['label_field_config'],
     };
 
     final db = _db(tenantId);
@@ -132,6 +137,9 @@ class WebLocalPartRepository implements PartRepository {
     }
     if (data.containsKey('label_company_address')) {
       payload['label_company_address'] = data['label_company_address'];
+    }
+    if (data.containsKey('label_field_config')) {
+      payload['label_field_config'] = data['label_field_config'];
     }
 
     final changed =
