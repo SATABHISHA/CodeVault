@@ -4,6 +4,7 @@ import 'package:codevault/features/labels/domain/label_layout.dart';
 import 'package:codevault/shared/widgets/barcode_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pdf/pdf.dart';
 
 void main() {
   test('PDF generator produces Code 128, QR and Data Matrix labels', () async {
@@ -114,6 +115,25 @@ void main() {
     const position = LabelLayoutPosition(x: 1.75, y: .5);
     expect(position.clamp().x, 1.75);
     expect(position.clamp().y, .5);
+  });
+
+  test('native PDF honors printer margins without scaling labels', () async {
+    final bytes = await const BrowserPdfGenerator().generate(
+      const BrowserLabelDocument(
+        title: 'PART NO: P-1',
+        content: 'P-1',
+        widthMm: 100,
+        heightMm: 30,
+        packQty: 2,
+        stickersPerRow: 2,
+      ),
+      pageFormat: const PdfPageFormat(
+        210 * PdfPageFormat.mm,
+        297 * PdfPageFormat.mm,
+        marginAll: 3 * PdfPageFormat.mm,
+      ),
+    );
+    expect(bytes.take(4), equals('%PDF'.codeUnits));
   });
 
   testWidgets('live code preview paints every supported symbology', (

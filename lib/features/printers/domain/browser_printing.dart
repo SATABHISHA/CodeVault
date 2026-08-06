@@ -69,7 +69,10 @@ class BrowserPdfGenerator {
   // PDF points makes the printed text roughly twice as large as the preview
   // and causes independently positioned rows to overlap. This conversion is
   // shared by every platform because they all print this document.
-  Future<Uint8List> generate(BrowserLabelDocument label) async {
+  Future<Uint8List> generate(
+    BrowserLabelDocument label, {
+    PdfPageFormat? pageFormat,
+  }) async {
     final document = pw.Document();
     final labelFont = pw.Font.ttf(
       await rootBundle.load(LabelTypography.fontAsset),
@@ -84,11 +87,23 @@ class BrowserPdfGenerator {
     // ── A4 page dimensions (no margins) ─────────────────────────────────────
     // Always use A4 so the print dialog shows the stickers at exact physical
     // size without scaling. Stickers are laid out starting from the top-left.
-    const a4W = 210.0 * PdfPageFormat.mm;
-    const a4H = 297.0 * PdfPageFormat.mm;
+    final sheetFormat =
+        pageFormat ??
+        const PdfPageFormat(
+          210.0 * PdfPageFormat.mm,
+          297.0 * PdfPageFormat.mm,
+          marginAll: 0,
+        );
 
     // How many sticker rows fit on one A4 page?
-    final rowsPerPage = (a4H / hPt).floor().clamp(1, 9999);
+    final rowsPerPage = (sheetFormat.availableHeight / hPt).floor().clamp(
+      1,
+      9999,
+    );
+    final columnsPerPage = math.min(
+      label.stickersPerRow,
+      (sheetFormat.availableWidth / wPt).floor().clamp(1, 9999),
+    );
 
     // Match preview proportions: keep inner canvas relatively large.
     final pad = (math.min(wPt, hPt) * 0.06).clamp(1.2, 4.0);
@@ -506,7 +521,7 @@ class BrowserPdfGenerator {
       final pageStickers = <pw.Widget>[];
       for (int r = 0; r < rowsPerPage; r++) {
         final rowCells = <pw.Widget>[];
-        for (int c = 0; c < label.stickersPerRow; c++) {
+        for (int c = 0; c < columnsPerPage; c++) {
           if (stickerIdx < label.packQty) {
             rowCells.add(buildSticker());
             stickerIdx++;
@@ -527,7 +542,7 @@ class BrowserPdfGenerator {
       document.addPage(
         pw.Page(
           // A4, zero margins — stickers print at exact physical size
-          pageFormat: const PdfPageFormat(a4W, a4H, marginAll: 0),
+          pageFormat: sheetFormat,
           build: (ctx) => pw.Column(
             mainAxisAlignment: pw.MainAxisAlignment.start,
             crossAxisAlignment: pw.CrossAxisAlignment.start,

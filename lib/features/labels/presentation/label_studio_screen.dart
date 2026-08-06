@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 
 import '../../../core/platform/platform_capabilities.dart'
@@ -2345,6 +2346,15 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     );
   }
 
+  PdfPageFormat? get _displayPdfPageFormat {
+    if (!PlatformCapabilities.current().isWindows) return null;
+    return const PdfPageFormat(
+      210 * PdfPageFormat.mm,
+      297 * PdfPageFormat.mm,
+      marginAll: 3 * PdfPageFormat.mm,
+    );
+  }
+
   Future<void> _generate({bool? withName}) async {
     if (partNumber.text.trim().isEmpty) {
       _notice('Select or enter a part first');
@@ -2357,6 +2367,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       }
       final bytes = await const BrowserPdfGenerator().generate(
         _getDocument(withName ?? includeName),
+        pageFormat: _displayPdfPageFormat,
       );
       await gateway.download(bytes, 'codevault-${partNumber.text}.pdf');
       _notice('Label PDF generated');
@@ -2378,15 +2389,34 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       if (autoDateTime) {
         _stampNow();
       }
-      final bytes = await const BrowserPdfGenerator().generate(
-        _getDocument(withName ?? includeName),
-      );
+      final document = _getDocument(withName ?? includeName);
       if (_selectedPrinter != null) {
         await Printing.directPrintPdf(
           printer: _selectedPrinter!,
-          onLayout: (format) async => bytes,
+          onLayout: (format) {
+            final safeInset = 3 * PdfPageFormat.mm;
+            final labelWidth = document.widthMm * PdfPageFormat.mm;
+            final labelHeight = document.heightMm * PdfPageFormat.mm;
+            final canInsetHorizontally =
+                format.width >= labelWidth + (safeInset * 2);
+            final canInsetVertically =
+                format.height >= labelHeight + (safeInset * 2);
+            return const BrowserPdfGenerator().generate(
+              document,
+              pageFormat: format.applyMargin(
+                left: canInsetHorizontally ? safeInset : format.marginLeft,
+                top: canInsetVertically ? safeInset : format.marginTop,
+                right: canInsetHorizontally ? safeInset : format.marginRight,
+                bottom: canInsetVertically ? safeInset : format.marginBottom,
+              ),
+            );
+          },
         );
       } else {
+        final bytes = await const BrowserPdfGenerator().generate(
+          document,
+          pageFormat: _displayPdfPageFormat,
+        );
         await gateway.showPrintDialog(
           bytes,
           'codevault-${partNumber.text}.pdf',
