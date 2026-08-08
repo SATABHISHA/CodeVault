@@ -17,12 +17,14 @@ import '../../../shared/widgets/barcode_view.dart';
 import '../../backup/application/backup_import_revision.dart';
 import '../../authentication/presentation/session_controller.dart';
 import '../application/production_activity.dart';
+import '../application/code_type_visibility_controller.dart';
 import '../data/local_part_repository.dart';
 import '../data/label_layout_store.dart';
 import '../data/part_repository.dart';
 import '../data/custom_label_profile_store.dart';
 import '../data/web_local_part_repository.dart';
 import '../domain/label_field_config.dart';
+import '../domain/code_type_visibility.dart';
 import '../domain/dynamic_label_field.dart';
 import '../domain/label_layout.dart';
 import '../domain/label_typography.dart';
@@ -75,6 +77,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   bool dualSideCodes = true;
   bool autoDateTime = true;
   String symbology = 'data_matrix';
+  String _scanValueSource = 'encoded_text';
   String labelSize = '100 × 30 mm';
   int stickersPerRow = 1; // will be set to maxStickersPerRow in initState
   static const double maxPageWidthMm = 210.0;
@@ -418,6 +421,50 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     return '00${partNumber.text}${dr.text}E$year$month${serial.text.padLeft(7, '0')}';
   }
 
+  Map<String, String> get _scanValueOptions => {
+    'encoded_text': 'Encoded text (default)',
+    'part_number': 'Part number',
+    'item_name': 'Item name',
+    'item_model': 'Item model',
+    'serial_number': 'Serial number',
+    'dr_code': 'DR code',
+    'pack_quantity': 'Pack quantity',
+    'company_name': 'Company name',
+    'company_address': 'Company address',
+    'port': 'Port label',
+    'date_time': 'Date and time',
+    for (final field in _dynamicFields)
+      if (field.label.trim().isNotEmpty)
+        'dynamic:${field.id}': 'Dynamic: ${field.label.trim()}',
+  };
+
+  bool _isValidScanValueSource(String source) =>
+      _scanValueOptions.containsKey(source);
+
+  String get scanData {
+    if (_scanValueSource.startsWith('dynamic:')) {
+      final id = _scanValueSource.substring('dynamic:'.length);
+      final value =
+          _dynamicFields.where((field) => field.id == id).firstOrNull?.value ??
+          '';
+      return value.trim().isEmpty ? codeData : value;
+    }
+    final value = switch (_scanValueSource) {
+      'part_number' => partNumber.text,
+      'item_name' => itemName.text,
+      'item_model' => model.text,
+      'serial_number' => serial.text,
+      'dr_code' => dr.text,
+      'pack_quantity' => pack.text,
+      'company_name' => companyName.text,
+      'company_address' => companyAddress.text,
+      'port' => portLabel.text,
+      'date_time' => '${labelDate.text} ${labelTime.text}'.trim(),
+      _ => codeData,
+    };
+    return value.trim().isEmpty ? codeData : value;
+  }
+
   String _twoDigits(int value) => value.toString().padLeft(2, '0');
 
   void _stampNow() {
@@ -435,48 +482,61 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   };
 
   @override
-  Widget build(BuildContext context) => CustomScrollView(
-    slivers: [
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-        sliver: SliverToBoxAdapter(child: _header(context)),
-      ),
-      SliverPadding(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-        sliver: SliverToBoxAdapter(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 1050;
-              final editor = _editor(context);
-              final catalog = _catalog(context);
-              final preview = _preview(context);
-              if (!wide) {
-                return Column(
+  Widget build(BuildContext context) {
+    final enabledCodeTypes = ref.watch(codeTypeVisibilityProvider);
+    final availableCodeTypes = CodeTypeVisibility.ordered
+        .where(enabledCodeTypes.contains)
+        .toList();
+    if (!availableCodeTypes.contains(symbology)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !availableCodeTypes.contains(symbology)) {
+          setState(() => symbology = availableCodeTypes.first);
+        }
+      });
+    }
+    return CustomScrollView(
+      slivers: [
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+          sliver: SliverToBoxAdapter(child: _header(context)),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+          sliver: SliverToBoxAdapter(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final wide = constraints.maxWidth >= 1050;
+                final editor = _editor(context);
+                final catalog = _catalog(context);
+                final preview = _preview(context);
+                if (!wide) {
+                  return Column(
+                    children: [
+                      editor,
+                      const SizedBox(height: 16),
+                      catalog,
+                      const SizedBox(height: 16),
+                      preview,
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    editor,
-                    const SizedBox(height: 16),
-                    catalog,
-                    const SizedBox(height: 16),
-                    preview,
+                    Expanded(flex: 5, child: editor),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 4, child: catalog),
+                    const SizedBox(width: 16),
+                    Expanded(flex: 5, child: preview),
                   ],
                 );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 5, child: editor),
-                  const SizedBox(width: 16),
-                  Expanded(flex: 4, child: catalog),
-                  const SizedBox(width: 16),
-                  Expanded(flex: 5, child: preview),
-                ],
-              );
-            },
+              },
+            ),
           ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 
   Widget _header(BuildContext context) => Container(
     padding: const EdgeInsets.all(24),
@@ -715,11 +775,23 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
           (value) => setState(() => stickersPerRow = int.tryParse(value) ?? 1),
         ),
         const SizedBox(height: 12),
-        _dropdown('Code type', symbology, const [
-          'code128',
-          'qr',
-          'data_matrix',
-        ], (value) => setState(() => symbology = value)),
+        _dropdown(
+          'Code type',
+          ref.watch(codeTypeVisibilityProvider).contains(symbology)
+              ? symbology
+              : CodeTypeVisibility.ordered.firstWhere(
+                  ref.watch(codeTypeVisibilityProvider).contains,
+                ),
+          CodeTypeVisibility.ordered
+              .where(ref.watch(codeTypeVisibilityProvider).contains)
+              .toList(),
+          (value) => setState(() => symbology = value),
+          key: ValueKey(
+            'code-types-${ref.watch(codeTypeVisibilityProvider).join('-')}',
+          ),
+        ),
+        const SizedBox(height: 12),
+        _scanValueSourceDropdown(),
         const SizedBox(height: 12),
         _stickerFieldSection(context),
         SwitchListTile.adaptive(
@@ -733,7 +805,13 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
             setState(() {
               dualSideCodes = value;
               if (value && symbology == 'code128') {
-                symbology = 'qr';
+                final enabled = ref.read(codeTypeVisibilityProvider);
+                symbology =
+                    const [
+                      'qr',
+                      'data_matrix',
+                    ].where(enabled.contains).firstOrNull ??
+                    symbology;
               }
             });
           },
@@ -983,7 +1061,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                       width: qrSide,
                                       height: qrSide,
                                       child: BarcodeView(
-                                        data: codeData,
+                                        data: scanData,
                                         symbology: codeSymbology,
                                       ),
                                     ),
@@ -1180,7 +1258,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     child: SizedBox(
                                       width: dualCenterWidth,
                                       child: Text(
-                                        codeData,
+                                        scanData,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
@@ -1207,7 +1285,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                       width: qrSide,
                                       height: qrSide,
                                       child: BarcodeView(
-                                        data: codeData,
+                                        data: scanData,
                                         symbology: codeSymbology,
                                       ),
                                     ),
@@ -1382,7 +1460,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                       height: singleBarcodeSize.height,
                                       width: singleBarcodeSize.width,
                                       child: BarcodeView(
-                                        data: codeData,
+                                        data: scanData,
                                         symbology: codeSymbology,
                                       ),
                                     ),
@@ -1400,7 +1478,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     child: SizedBox(
                                       width: singleTextWidth,
                                       child: Text(
-                                        codeData,
+                                        scanData,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
@@ -1657,8 +1735,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     String label,
     String value,
     List<String> values,
-    ValueChanged<String> changed,
-  ) => DropdownButtonFormField<String>(
+    ValueChanged<String> changed, {
+    Key? key,
+  }) => DropdownButtonFormField<String>(
+    key: key,
     initialValue: value,
     isExpanded: true,
     decoration: InputDecoration(labelText: label),
@@ -1674,6 +1754,31 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       if (next != null) changed(next);
     },
   );
+
+  Widget _scanValueSourceDropdown() {
+    final options = _scanValueOptions;
+    final selected = options.containsKey(_scanValueSource)
+        ? _scanValueSource
+        : 'encoded_text';
+    return DropdownButtonFormField<String>(
+      key: ValueKey('scan-source-$selected-${options.length}'),
+      initialValue: selected,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Value returned when scanned',
+        prefixIcon: Icon(Icons.document_scanner_outlined),
+        helperText:
+            'Select the value encoded in the barcode, QR or Data Matrix',
+      ),
+      items: [
+        for (final option in options.entries)
+          DropdownMenuItem(value: option.key, child: Text(option.value)),
+      ],
+      onChanged: (value) {
+        if (value != null) setState(() => _scanValueSource = value);
+      },
+    );
+  }
 
   bool _isVisible(LabelFieldKey keyName) =>
       LabelFieldConfig.isVisible(keyName, _labelFieldSettings);
@@ -1846,11 +1951,14 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                       ),
                       IconButton(
                         tooltip: 'Delete field',
-                        onPressed: () => setState(
-                          () => _dynamicFields = _dynamicFields
+                        onPressed: () => setState(() {
+                          _dynamicFields = _dynamicFields
                               .where((item) => item.id != field.id)
-                              .toList(),
-                        ),
+                              .toList();
+                          if (_scanValueSource == 'dynamic:${field.id}') {
+                            _scanValueSource = 'encoded_text';
+                          }
+                        }),
                         icon: const Icon(Icons.delete_outline),
                       ),
                     ],
@@ -2180,6 +2288,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     'label_company_address': companyAddress.text.trim(),
     'label_field_config': LabelFieldConfig.toJsonObject(_labelFieldSettings),
     'dynamic_label_fields': DynamicLabelField.listToJson(_dynamicFields),
+    'scan_value_source': _scanValueSource,
     'is_active': true,
   };
 
@@ -2239,6 +2348,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       part.labelFieldSettings,
     );
     _dynamicFields = List.of(part.dynamicFields);
+    _scanValueSource = _isValidScanValueSource(part.scanValueSource)
+        ? part.scanValueSource
+        : 'encoded_text';
     includeName = _isVisible(LabelFieldKey.itemName);
     message = '${part.number} selected';
   });
@@ -2321,7 +2433,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     final size = sizes[labelSize]!;
     return BrowserLabelDocument(
       title: 'PART NO: ${partNumber.text}',
-      content: codeData,
+      content: scanData,
       widthMm: size.$1,
       heightMm: size.$2,
       symbology: symbology,
@@ -2442,6 +2554,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     quantity.text = '1';
     _labelFieldSettings = LabelFieldConfig.defaults();
     _dynamicFields = const [];
+    _scanValueSource = 'encoded_text';
     includeName = _isVisible(LabelFieldKey.itemName);
     companyName.text = WindowsSession.companyName;
     companyAddress.text = WindowsSession.companyAddress;

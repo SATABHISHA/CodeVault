@@ -38,6 +38,8 @@ class WebLocalPartRepository implements PartRepository {
       dynamicFields: DynamicLabelField.listFromDynamic(
         payload['dynamic_label_fields'],
       ),
+      scanValueSource:
+          payload['scan_value_source'] as String? ?? 'encoded_text',
     );
   }
 
@@ -83,6 +85,7 @@ class WebLocalPartRepository implements PartRepository {
       'label_company_address': data['label_company_address'],
       'label_field_config': data['label_field_config'],
       'dynamic_label_fields': data['dynamic_label_fields'],
+      'scan_value_source': data['scan_value_source'] ?? 'encoded_text',
     };
 
     final db = _db(tenantId);
@@ -148,6 +151,9 @@ class WebLocalPartRepository implements PartRepository {
     }
     if (data.containsKey('dynamic_label_fields')) {
       payload['dynamic_label_fields'] = data['dynamic_label_fields'];
+    }
+    if (data.containsKey('scan_value_source')) {
+      payload['scan_value_source'] = data['scan_value_source'];
     }
 
     final changed =

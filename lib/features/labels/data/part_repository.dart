@@ -16,6 +16,7 @@ class PartRecord {
     this.labelCompanyAddress = '',
     Map<LabelFieldKey, LabelFieldSetting>? labelFieldSettings,
     List<DynamicLabelField>? dynamicFields,
+    this.scanValueSource = 'encoded_text',
   }) : labelFieldSettings = LabelFieldConfig.mergeWithDefaults(
          labelFieldSettings,
        ),
@@ -45,6 +46,7 @@ class PartRecord {
       dynamicFields: DynamicLabelField.listFromDynamic(
         json['dynamic_label_fields'],
       ),
+      scanValueSource: json['scan_value_source'] as String? ?? 'encoded_text',
     );
   }
 
@@ -60,6 +62,7 @@ class PartRecord {
   final String labelCompanyAddress;
   final Map<LabelFieldKey, LabelFieldSetting> labelFieldSettings;
   final List<DynamicLabelField> dynamicFields;
+  final String scanValueSource;
 }
 
 /// Abstract interface — implemented by [CloudPartRepository] (web/mobile) and

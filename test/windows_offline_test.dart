@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:codevault/features/backup/presentation/backup_screen.dart';
+import 'package:codevault/features/labels/data/local_part_repository.dart';
 import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:codevault/features/windows_desktop/application/local_account_service.dart';
 import 'package:codevault/features/windows_desktop/application/local_backup_service.dart';
@@ -105,6 +106,23 @@ void main() {
         );
     expect(await database.select(database.parts).get(), hasLength(1));
     expect(await database.select(database.labelTemplates).get(), hasLength(1));
+  });
+
+  test('part scan value source persists in the Windows database', () async {
+    final companyId = await _initialize(accounts);
+    final repository = LocalPartRepository(database);
+    final created = await repository.create(companyId, {
+      'part_number': 'P-8569',
+      'item_name': 'Samsung',
+      'item_model': 'S26 Pro',
+      'default_pack_quantity': 1,
+      'barcode_type': 'data_matrix',
+      'scan_value_source': 'item_name',
+    });
+    expect(created.scanValueSource, 'item_name');
+
+    final restored = await repository.list(companyId);
+    expect(restored.single.scanValueSource, 'item_name');
   });
 
   test(

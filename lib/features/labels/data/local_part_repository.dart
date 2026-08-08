@@ -15,16 +15,19 @@ class LocalPartRepository implements PartRepository {
   final LocalDatabase _db;
   static const _labelFieldConfigPrefix = 'part-label-config:';
   static const _dynamicFieldsPrefix = 'part-dynamic-fields:';
+  static const _scanValueSourcePrefix = 'part-scan-source:';
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
   String _configKey(String partId) => '$_labelFieldConfigPrefix$partId';
   String _dynamicFieldsKey(String partId) => '$_dynamicFieldsPrefix$partId';
+  String _scanValueSourceKey(String partId) => '$_scanValueSourcePrefix$partId';
 
   PartRecord _fromRow(
     Part row, {
     String? configJson,
     String? dynamicFieldsJson,
+    String? scanValueSource,
   }) => PartRecord(
     id: row.id,
     number: row.description ?? row.id, // description stores the part number
@@ -38,6 +41,7 @@ class LocalPartRepository implements PartRepository {
     labelCompanyAddress: row.labelCompanyAddress ?? '',
     labelFieldSettings: LabelFieldConfig.fromEncodedJson(configJson),
     dynamicFields: DynamicLabelField.listFromDynamic(dynamicFieldsJson),
+    scanValueSource: scanValueSource ?? 'encoded_text',
   );
 
   Future<Map<String, String>> _loadSettingsByPartIds(
@@ -100,6 +104,22 @@ class LocalPartRepository implements PartRepository {
         ),
       );
 
+  Future<void> _saveScanValueSource(
+    String tenantId,
+    String partId,
+    Object? rawValue,
+  ) => _db
+      .into(_db.localSettings)
+      .insertOnConflictUpdate(
+        LocalSettingsCompanion.insert(
+          companyId: tenantId,
+          key: _scanValueSourceKey(partId),
+          value: rawValue is String && rawValue.isNotEmpty
+              ? rawValue
+              : 'encoded_text',
+        ),
+      );
+
   // ── interface ─────────────────────────────────────────────────────────────
 
   @override
@@ -123,12 +143,18 @@ class LocalPartRepository implements PartRepository {
       ids,
       _dynamicFieldsPrefix,
     );
+    final scanValueSources = await _loadSettingsByPartIds(
+      tenantId,
+      ids,
+      _scanValueSourcePrefix,
+    );
     return rows
         .map(
           (row) => _fromRow(
             row,
             configJson: configs[row.id],
             dynamicFieldsJson: dynamicFields[row.id],
+            scanValueSource: scanValueSources[row.id],
           ),
         )
         .toList();
@@ -161,6 +187,7 @@ class LocalPartRepository implements PartRepository {
         );
     await _saveLabelFieldConfig(tenantId, id, data['label_field_config']);
     await _saveDynamicFields(tenantId, id, data['dynamic_label_fields']);
+    await _saveScanValueSource(tenantId, id, data['scan_value_source']);
     final row = await (_db.select(
       _db.parts,
     )..where((t) => t.id.equals(id))).getSingle();
@@ -177,10 +204,18 @@ class LocalPartRepository implements PartRepository {
                   t.key.equals(_dynamicFieldsKey(id)),
             ))
             .getSingleOrNull();
+    final scanValueSource =
+        await (_db.select(_db.localSettings)..where(
+              (t) =>
+                  t.companyId.equals(tenantId) &
+                  t.key.equals(_scanValueSourceKey(id)),
+            ))
+            .getSingleOrNull();
     return _fromRow(
       row,
       configJson: config?.value,
       dynamicFieldsJson: dynamicFields?.value,
+      scanValueSource: scanValueSource?.value,
     );
   }
 
@@ -218,6 +253,7 @@ class LocalPartRepository implements PartRepository {
     }
     await _saveLabelFieldConfig(tenantId, part.id, data['label_field_config']);
     await _saveDynamicFields(tenantId, part.id, data['dynamic_label_fields']);
+    await _saveScanValueSource(tenantId, part.id, data['scan_value_source']);
     final row =
         await (_db.select(_db.parts)..where(
               (t) => t.companyId.equals(tenantId) & t.id.equals(part.id),
@@ -237,10 +273,18 @@ class LocalPartRepository implements PartRepository {
                   t.key.equals(_dynamicFieldsKey(part.id)),
             ))
             .getSingleOrNull();
+    final scanValueSource =
+        await (_db.select(_db.localSettings)..where(
+              (t) =>
+                  t.companyId.equals(tenantId) &
+                  t.key.equals(_scanValueSourceKey(part.id)),
+            ))
+            .getSingleOrNull();
     return _fromRow(
       row,
       configJson: config?.value,
       dynamicFieldsJson: dynamicFields?.value,
+      scanValueSource: scanValueSource?.value,
     );
   }
 
@@ -251,7 +295,8 @@ class LocalPartRepository implements PartRepository {
           (t) =>
               t.companyId.equals(tenantId) &
               (t.key.equals(_configKey(id)) |
-                  t.key.equals(_dynamicFieldsKey(id))),
+                  t.key.equals(_dynamicFieldsKey(id)) |
+                  t.key.equals(_scanValueSourceKey(id))),
         ))
         .go();
   }
