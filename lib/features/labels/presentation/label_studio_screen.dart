@@ -30,6 +30,8 @@ import '../domain/dynamic_label_field.dart';
 import '../domain/label_layout.dart';
 import '../domain/label_typography.dart';
 
+enum _WindowsPrintAction { print, exportPdf }
+
 class LabelStudioScreen extends ConsumerStatefulWidget {
   const LabelStudioScreen({super.key, this.repository, this.printGateway});
   final PartRepository? repository;
@@ -2753,12 +2755,80 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     }
   }
 
+  Future<_WindowsPrintAction?> _chooseWindowsPrintAction() async {
+    var availablePrinters = const <Printer>[];
+    try {
+      final refreshed = await Printing.listPrinters().timeout(
+        const Duration(seconds: 3),
+      );
+      availablePrinters = refreshed
+          .where((printer) => printer.isAvailable)
+          .toList();
+    } catch (_) {
+      // Treat an unresponsive Windows spooler as unavailable. This avoids
+      // entering the native connection dialog with stale printer metadata.
+    }
+
+    if (!mounted) return null;
+    setState(() {
+      _availablePrinters = availablePrinters;
+      _selectedPrinter = availablePrinters
+          .where((printer) => printer.url == _selectedPrinter?.url)
+          .firstOrNull;
+      if (_selectedPrinter == null && availablePrinters.isNotEmpty) {
+        _selectedPrinter = availablePrinters
+            .where((printer) => printer.isDefault)
+            .firstOrNull;
+        _selectedPrinter ??= availablePrinters.first;
+      }
+      port = _selectedPrinter?.name ?? 'System Default';
+    });
+
+    final hasAvailablePrinter = availablePrinters.isNotEmpty;
+    return showDialog<_WindowsPrintAction>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          hasAvailablePrinter ? 'Print or export label' : 'Printer unavailable',
+        ),
+        content: Text(
+          hasAvailablePrinter
+              ? 'Choose Open print dialog to select a connected printer, or export the labels directly as a PDF.'
+              : 'Windows did not report an available printer. You can export the labels as a PDF instead.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          OutlinedButton.icon(
+            onPressed: () =>
+                Navigator.pop(dialogContext, _WindowsPrintAction.exportPdf),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            label: const Text('Export PDF'),
+          ),
+          if (hasAvailablePrinter)
+            FilledButton.icon(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, _WindowsPrintAction.print),
+              icon: const Icon(Icons.print_outlined),
+              label: const Text('Open print dialog'),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _print() async {
     final copies = int.tryParse(quantity.text) ?? 0;
     if (partNumber.text.trim().isEmpty || copies < 1) {
       _notice('Select a part and enter a valid print quantity');
       return;
     }
+    final isWindows = PlatformCapabilities.current().isWindows;
+    final windowsAction = isWindows ? await _chooseWindowsPrintAction() : null;
+    if (isWindows && windowsAction == null) return;
+
     setState(() => busy = true);
     try {
       if (autoDateTime) {
@@ -2766,24 +2836,20 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       }
       final document = _getDocument(true);
       final filename = 'codevault-${partNumber.text}.pdf';
-      final isWindows = PlatformCapabilities.current().isWindows;
-      if (isWindows && _availablePrinters.isNotEmpty) {
-        final submitted = await Printing.layoutPdf(
-          name: filename,
-          onLayout: (format) => _generatePrintPdf(document, format),
-        );
-        if (!submitted) {
-          _notice('Printing cancelled');
-          return;
-        }
-      } else if (isWindows) {
+      if (isWindows && windowsAction == _WindowsPrintAction.exportPdf) {
         final bytes = await const BrowserPdfGenerator().generate(
           document,
           pageFormat: _displayPdfPageFormat,
         );
         await gateway.download(bytes, filename);
-        _notice('No printer is available. The label was saved as a PDF');
+        _notice('Label PDF exported');
         return;
+      } else if (isWindows) {
+        final submitted = await Printing.layoutPdf(
+          name: filename,
+          onLayout: (format) => _generatePrintPdf(document, format),
+        );
+        if (!submitted) return;
       } else if (_selectedPrinter != null) {
         await Printing.directPrintPdf(
           printer: _selectedPrinter!,
