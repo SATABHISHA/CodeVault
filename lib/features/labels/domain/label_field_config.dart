@@ -10,6 +10,7 @@ enum LabelFieldKey {
   dateTime,
   codeData,
   barcode,
+  serialNumber,
 }
 
 class LabelFieldSetting {
@@ -61,6 +62,7 @@ class LabelFieldConfig {
     LabelFieldKey.dateTime: LabelFieldSetting(visible: true, fontSize: 10),
     LabelFieldKey.codeData: LabelFieldSetting(visible: true, fontSize: 10),
     LabelFieldKey.barcode: LabelFieldSetting(visible: true, fontSize: 10),
+    LabelFieldKey.serialNumber: LabelFieldSetting(visible: true, fontSize: 10),
   };
 
   static Map<LabelFieldKey, LabelFieldSetting> defaults() => {

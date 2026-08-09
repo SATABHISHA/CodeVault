@@ -1,5 +1,6 @@
 import 'package:codevault/features/printers/domain/browser_printing.dart';
 import 'package:codevault/features/labels/domain/dynamic_label_field.dart';
+import 'package:codevault/features/labels/domain/label_field_config.dart';
 import 'package:codevault/features/labels/domain/label_layout.dart';
 import 'package:codevault/shared/widgets/barcode_view.dart';
 import 'package:flutter/material.dart';
@@ -50,6 +51,76 @@ void main() {
       );
       expect(bytes.take(4), equals('%PDF'.codeUnits), reason: '$size');
     }
+  });
+
+  test('serial field settings remain compatible with saved part masters', () {
+    final legacy = LabelFieldConfig.fromJsonObject({
+      'partNumber': {'visible': true, 'font_size': 12},
+    });
+    expect(legacy[LabelFieldKey.serialNumber]!.visible, isTrue);
+    expect(legacy[LabelFieldKey.serialNumber]!.fontSize, 10);
+
+    final settings = LabelFieldConfig.defaults();
+    settings[LabelFieldKey.serialNumber] = const LabelFieldSetting(
+      visible: false,
+      fontSize: 15,
+    );
+    final restored = LabelFieldConfig.fromEncodedJson(
+      LabelFieldConfig.toEncodedJson(settings),
+    );
+    expect(restored[LabelFieldKey.serialNumber]!.visible, isFalse);
+    expect(restored[LabelFieldKey.serialNumber]!.fontSize, 15);
+  });
+
+  test('serial field positions round-trip and extend legacy layouts', () {
+    final legacy = LabelLayout.fromEncodedJson(
+      '{"singlePartNumber":{"x":0.4,"y":0.2,"rotation":0.0}}',
+    );
+    expect(legacy.positions[LabelLayoutElement.singleSerialNumber], isNotNull);
+    expect(legacy.positions[LabelLayoutElement.dualSerialNumber], isNotNull);
+
+    final customized = legacy
+        .copyWithElement(
+          LabelLayoutElement.singleSerialNumber,
+          const LabelLayoutPosition(x: 1.7, y: .44, rotation: .8),
+        )
+        .copyWithElement(
+          LabelLayoutElement.dualSerialNumber,
+          const LabelLayoutPosition(x: .38, y: .71, rotation: -.5),
+        );
+    final restored = LabelLayout.fromEncodedJson(customized.toEncodedJson());
+    expect(restored.positionFor(LabelLayoutElement.singleSerialNumber).x, 1.7);
+    expect(
+      restored.positionFor(LabelLayoutElement.singleSerialNumber).rotation,
+      .8,
+    );
+    expect(restored.positionFor(LabelLayoutElement.dualSerialNumber).y, .71);
+    expect(
+      restored.positionFor(LabelLayoutElement.dualSerialNumber).rotation,
+      -.5,
+    );
+  });
+
+  test('PDF supports hiding the serial-number label', () async {
+    final settings = LabelFieldConfig.defaults();
+    settings[LabelFieldKey.serialNumber] = const LabelFieldSetting(
+      visible: false,
+      fontSize: 10,
+    );
+    final bytes = await const BrowserPdfGenerator().generate(
+      BrowserLabelDocument(
+        title: 'PART NO: P-1',
+        content: 'P-1-001',
+        widthMm: 100,
+        heightMm: 30,
+        symbology: 'data_matrix',
+        partNumber: 'P-1',
+        serialNumber: '001',
+        dualSideCodes: true,
+        fieldSettings: settings,
+      ),
+    );
+    expect(bytes.take(4), equals('%PDF'.codeUnits));
   });
 
   test('dynamic label fields round-trip and render in the PDF', () async {
@@ -128,6 +199,104 @@ void main() {
     expect(pdfRotationFromPreview(1.2), -1.2);
     expect(pdfRotationFromPreview(-.75), .75);
     expect(pdfRotationFromPreview(0), 0);
+  });
+
+  test('part and serial values increment once per pack label', () {
+    expect(incrementLabelNumber('001', 2), '003');
+    expect(incrementLabelNumber('PART-009', 2), 'PART-011');
+    expect(incrementLabelNumber('NO-NUMBER', 2), 'NO-NUMBER');
+
+    const document = BrowserLabelDocument(
+      title: 'PART NO: 009',
+      content: 'original-encoded-text',
+      widthMm: 100,
+      heightMm: 30,
+      partNumber: '009',
+      serialNumber: '001',
+      scanValueSource: 'encoded_text',
+      encodedDrCode: 'NR',
+      encodedYearMonth: '2608',
+      autoIncrementPartNumber: true,
+      partNumberIncrement: 2,
+      autoIncrementSerialNumber: true,
+      serialNumberIncrement: 5,
+    );
+
+    expect(document.stickerValuesAt(0).partNumber, '009');
+    expect(document.stickerValuesAt(0).serialNumber, '001');
+    expect(document.stickerValuesAt(0).content, 'original-encoded-text');
+    expect(document.stickerValuesAt(2).partNumber, '013');
+    expect(document.stickerValuesAt(2).serialNumber, '011');
+    expect(document.stickerValuesAt(2).content, '00013NRE26080000011');
+  });
+
+  test('disabled increments preserve the exact encoded content', () {
+    const document = BrowserLabelDocument(
+      title: 'PART NO: 009',
+      content: '  custom encoded value  ',
+      widthMm: 100,
+      heightMm: 30,
+      partNumber: '009',
+      serialNumber: '001',
+      scanValueSource: 'encoded_text',
+      encodedDrCode: 'NR',
+      encodedYearMonth: '2608',
+    );
+
+    expect(document.stickerValuesAt(4).partNumber, '009');
+    expect(document.stickerValuesAt(4).serialNumber, '001');
+    expect(document.stickerValuesAt(4).content, '  custom encoded value  ');
+  });
+
+  test('selected part or serial scan source changes on every label', () {
+    const partDocument = BrowserLabelDocument(
+      title: 'PART NO: P-007',
+      content: 'P-007',
+      widthMm: 100,
+      heightMm: 30,
+      partNumber: 'P-007',
+      serialNumber: '001',
+      scanValueSource: 'part_number',
+      autoIncrementPartNumber: true,
+      partNumberIncrement: 3,
+    );
+    const serialDocument = BrowserLabelDocument(
+      title: 'PART NO: P-007',
+      content: '001',
+      widthMm: 100,
+      heightMm: 30,
+      partNumber: 'P-007',
+      serialNumber: '001',
+      scanValueSource: 'serial_number',
+      autoIncrementSerialNumber: true,
+      serialNumberIncrement: 2,
+    );
+
+    expect(partDocument.stickerValuesAt(2).content, 'P-013');
+    expect(serialDocument.stickerValuesAt(2).content, '005');
+  });
+
+  test('PDF generator renders incremented pack labels', () async {
+    final bytes = await const BrowserPdfGenerator().generate(
+      const BrowserLabelDocument(
+        title: 'PART NO: 100',
+        content: '00100NRE26080000001',
+        widthMm: 100,
+        heightMm: 30,
+        symbology: 'data_matrix',
+        partNumber: '100',
+        serialNumber: '001',
+        packQty: 3,
+        stickersPerRow: 2,
+        scanValueSource: 'encoded_text',
+        encodedDrCode: 'NR',
+        encodedYearMonth: '2608',
+        autoIncrementPartNumber: true,
+        autoIncrementSerialNumber: true,
+      ),
+    );
+
+    expect(bytes.take(4), equals('%PDF'.codeUnits));
   });
 
   test('native PDF honors printer margins without scaling labels', () async {

@@ -18,6 +18,8 @@ enum LabelLayoutElement {
   dualItemName,
   dualCodeData,
   dualRightCode,
+  singleSerialNumber,
+  dualSerialNumber,
 }
 
 class LabelLayoutRect {
@@ -98,6 +100,12 @@ class LabelLayout {
       x: 0.02,
       y: 0.38,
     ),
+    // Keep the serial on the right side of the model row so legacy barcode
+    // and code-data positions do not need to move when this field is added.
+    LabelLayoutElement.singleSerialNumber: const LabelLayoutPosition(
+      x: 2.45,
+      y: 0.38,
+    ),
     LabelLayoutElement.singleDateTime: const LabelLayoutPosition(
       x: 0.02,
       y: 0.46,
@@ -135,6 +143,10 @@ class LabelLayout {
     LabelLayoutElement.dualCodeData: const LabelLayoutPosition(
       x: 0.24,
       y: 0.66,
+    ),
+    LabelLayoutElement.dualSerialNumber: const LabelLayoutPosition(
+      x: 0.24,
+      y: 0.78,
     ),
     LabelLayoutElement.dualRightCode: const LabelLayoutPosition(
       x: 0.78,

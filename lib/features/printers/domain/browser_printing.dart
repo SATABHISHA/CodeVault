@@ -15,6 +15,20 @@ import '../../labels/domain/label_typography.dart';
 /// upward-positive Y axis. Negating the angle preserves the visual direction.
 double pdfRotationFromPreview(double previewRotation) => -previewRotation;
 
+/// Increments the last numeric segment while preserving its minimum width.
+/// Examples: `001` + 2 -> `003`, `PART-009` + 2 -> `PART-011`.
+String incrementLabelNumber(String value, int increment) {
+  if (increment == 0) return value;
+  final matches = RegExp(r'\d+').allMatches(value).toList();
+  if (matches.isEmpty) return value;
+  final match = matches.last;
+  final digits = match.group(0)!;
+  final next = BigInt.parse(digits) + BigInt.from(increment);
+  if (next.isNegative) return value;
+  final replacement = next.toString().padLeft(digits.length, '0');
+  return value.replaceRange(match.start, match.end, replacement);
+}
+
 class BrowserLabelDocument {
   const BrowserLabelDocument({
     required this.title,
@@ -27,6 +41,7 @@ class BrowserLabelDocument {
     this.itemName = '',
     this.model = '',
     this.partNumber = '',
+    this.serialNumber = '',
     this.port = '',
     this.dateText = '',
     this.timeText = '',
@@ -40,6 +55,13 @@ class BrowserLabelDocument {
     this.resolvedLayoutRects = const {},
     this.resolvedDynamicRects = const {},
     this.previewCanvasHeight,
+    this.scanValueSource = 'encoded_text',
+    this.encodedDrCode = '',
+    this.encodedYearMonth,
+    this.autoIncrementPartNumber = false,
+    this.partNumberIncrement = 1,
+    this.autoIncrementSerialNumber = false,
+    this.serialNumberIncrement = 1,
   });
   final String title;
   final String content;
@@ -51,6 +73,7 @@ class BrowserLabelDocument {
   final String itemName;
   final String model;
   final String partNumber;
+  final String serialNumber;
   final String port;
   final String dateText;
   final String timeText;
@@ -64,6 +87,47 @@ class BrowserLabelDocument {
   final Map<LabelLayoutElement, LabelLayoutRect> resolvedLayoutRects;
   final Map<String, LabelLayoutRect> resolvedDynamicRects;
   final double? previewCanvasHeight;
+  final String scanValueSource;
+  final String encodedDrCode;
+  final String? encodedYearMonth;
+  final bool autoIncrementPartNumber;
+  final int partNumberIncrement;
+  final bool autoIncrementSerialNumber;
+  final int serialNumberIncrement;
+
+  ({String partNumber, String serialNumber, String content}) stickerValuesAt(
+    int index,
+  ) {
+    final safeIndex = index < 0 ? 0 : index;
+    if (safeIndex == 0) {
+      return (
+        partNumber: partNumber,
+        serialNumber: serialNumber,
+        content: content,
+      );
+    }
+    final resolvedPartNumber = autoIncrementPartNumber
+        ? incrementLabelNumber(partNumber, partNumberIncrement * safeIndex)
+        : partNumber;
+    final resolvedSerialNumber = autoIncrementSerialNumber
+        ? incrementLabelNumber(serialNumber, serialNumberIncrement * safeIndex)
+        : serialNumber;
+    final partChanged = resolvedPartNumber != partNumber;
+    final serialChanged = resolvedSerialNumber != serialNumber;
+    final resolvedContent = switch (scanValueSource) {
+      'part_number' when partChanged => resolvedPartNumber,
+      'serial_number' when serialChanged => resolvedSerialNumber,
+      'encoded_text'
+          when encodedYearMonth != null && (partChanged || serialChanged) =>
+        '00$resolvedPartNumber${encodedDrCode}E$encodedYearMonth${resolvedSerialNumber.padLeft(7, '0')}',
+      _ => content,
+    };
+    return (
+      partNumber: resolvedPartNumber,
+      serialNumber: resolvedSerialNumber,
+      content: resolvedContent,
+    );
+  }
 }
 
 class BrowserPdfGenerator {
@@ -132,6 +196,7 @@ class BrowserPdfGenerator {
     final fCompany = scaledFont(LabelFieldKey.companyName, min: 1.0);
     final fAddress = scaledFont(LabelFieldKey.companyAddress);
     final fPart = scaledFont(LabelFieldKey.partNumber, min: 1.0);
+    final fSerial = scaledFont(LabelFieldKey.serialNumber, min: 1.0);
     final fItem = scaledFont(LabelFieldKey.itemName);
     final fModel = scaledFont(LabelFieldKey.model);
     final fPort = scaledFont(LabelFieldKey.port);
@@ -165,6 +230,7 @@ class BrowserPdfGenerator {
       fCompany,
       fAddress,
       fPart,
+      fSerial,
       fItem,
       fModel,
       fPort,
@@ -174,6 +240,7 @@ class BrowserPdfGenerator {
     final dualFontPeak = [
       fCompany,
       fPart,
+      fSerial,
       fItem,
       fModel,
       fPort,
@@ -288,7 +355,9 @@ class BrowserPdfGenerator {
 
     // ── Single sticker widget ────────────────────────────────────────────────
     // Uses FIXED width × height and clips content. Never grows beyond bounds.
-    pw.Widget buildSticker() => pw.ClipRect(
+    pw.Widget buildSticker(
+      ({String partNumber, String serialNumber, String content}) values,
+    ) => pw.ClipRect(
       child: pw.Container(
         width: wPt,
         height: hPt,
@@ -304,7 +373,11 @@ class BrowserPdfGenerator {
                   element: LabelLayoutElement.dualLeftCode,
                   width: twinSide,
                   height: twinSide,
-                  child: _buildSquareCode(label: label, side: twinSide),
+                  child: _buildSquareCode(
+                    symbology: label.symbology,
+                    data: values.content,
+                    side: twinSide,
+                  ),
                 ),
               if (visible(LabelFieldKey.companyName))
                 positionedElement(
@@ -380,7 +453,7 @@ class BrowserPdfGenerator {
                   width: centerW,
                   height: dualLineH,
                   child: pw.Text(
-                    'PART NO: ${label.partNumber.isEmpty ? '-' : label.partNumber}',
+                    'PART NO: ${values.partNumber.isEmpty ? '-' : values.partNumber}',
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
                     style: pw.TextStyle(
@@ -408,13 +481,30 @@ class BrowserPdfGenerator {
                     ),
                   ),
                 ),
+              if (visible(LabelFieldKey.serialNumber))
+                positionedElement(
+                  element: LabelLayoutElement.dualSerialNumber,
+                  width: centerW,
+                  height: dualLineH,
+                  child: pw.Text(
+                    'SERIAL NO: ${values.serialNumber.isEmpty ? '-' : values.serialNumber}',
+                    maxLines: 1,
+                    overflow: pw.TextOverflow.clip,
+                    style: pw.TextStyle(
+                      font: labelFont,
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: fSerial,
+                      letterSpacing: LabelTypography.textTracking,
+                    ),
+                  ),
+                ),
               if (visible(LabelFieldKey.codeData))
                 positionedElement(
                   element: LabelLayoutElement.dualCodeData,
                   width: centerW,
                   height: dualLineH,
                   child: pw.Text(
-                    label.content,
+                    values.content,
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
                     style: pw.TextStyle(
@@ -430,7 +520,11 @@ class BrowserPdfGenerator {
                   element: LabelLayoutElement.dualRightCode,
                   width: twinSide,
                   height: twinSide,
-                  child: _buildSquareCode(label: label, side: twinSide),
+                  child: _buildSquareCode(
+                    symbology: label.symbology,
+                    data: values.content,
+                    side: twinSide,
+                  ),
                 ),
             ] else ...[
               if (visible(LabelFieldKey.companyName))
@@ -474,7 +568,9 @@ class BrowserPdfGenerator {
                   width: singleTextW,
                   height: singleLineH,
                   child: pw.Text(
-                    label.title,
+                    values.partNumber.isEmpty
+                        ? label.title
+                        : 'PART NO: ${values.partNumber}',
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
                     style: pw.TextStyle(
@@ -513,6 +609,22 @@ class BrowserPdfGenerator {
                     ),
                   ),
                 ),
+              if (visible(LabelFieldKey.serialNumber))
+                positionedElement(
+                  element: LabelLayoutElement.singleSerialNumber,
+                  width: singleTextW,
+                  height: singleLineH,
+                  child: pw.Text(
+                    'SERIAL NO: ${values.serialNumber.isEmpty ? '-' : values.serialNumber}',
+                    maxLines: 1,
+                    overflow: pw.TextOverflow.clip,
+                    style: pw.TextStyle(
+                      font: labelFont,
+                      fontWeight: pw.FontWeight.bold,
+                      fontSize: fSerial,
+                    ),
+                  ),
+                ),
               if (showDateTime)
                 positionedElement(
                   element: LabelLayoutElement.singleDateTime,
@@ -529,7 +641,7 @@ class BrowserPdfGenerator {
                   height: barcodeH,
                   child: pw.BarcodeWidget(
                     barcode: _barcodeFor(label.symbology),
-                    data: label.content,
+                    data: values.content,
                     drawText: false,
                   ),
                 ),
@@ -539,7 +651,7 @@ class BrowserPdfGenerator {
                   width: singleTextW,
                   height: codeLineH,
                   child: pw.Text(
-                    label.content,
+                    values.content,
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
                     style: pw.TextStyle(font: labelFont, fontSize: fContent),
@@ -564,7 +676,7 @@ class BrowserPdfGenerator {
         final rowCells = <pw.Widget>[];
         for (int c = 0; c < columnsPerPage; c++) {
           if (stickerIdx < label.packQty) {
-            rowCells.add(buildSticker());
+            rowCells.add(buildSticker(label.stickerValuesAt(stickerIdx)));
             stickerIdx++;
           } else {
             // Empty cell — keeps row width consistent
@@ -603,16 +715,15 @@ class BrowserPdfGenerator {
   };
 
   pw.Widget _buildSquareCode({
-    required BrowserLabelDocument label,
+    required String symbology,
+    required String data,
     required double side,
   }) => pw.SizedBox(
     width: side,
     height: side,
     child: pw.BarcodeWidget(
-      barcode: _barcodeFor(
-        label.symbology == 'code128' ? 'qr' : label.symbology,
-      ),
-      data: label.content,
+      barcode: _barcodeFor(symbology == 'code128' ? 'qr' : symbology),
+      data: data,
       drawText: false,
     ),
   );

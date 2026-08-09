@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:pdf/pdf.dart';
 import 'package:printing/printing.dart';
 
@@ -63,6 +64,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   final itemName = TextEditingController();
   final model = TextEditingController();
   final serial = TextEditingController(text: '001');
+  final partIncrementBy = TextEditingController(text: '1');
+  final serialIncrementBy = TextEditingController(text: '1');
   final dr = TextEditingController(text: 'NR');
   final pack = TextEditingController(text: '1');
   final quantity = TextEditingController(text: '1');
@@ -79,6 +82,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   bool includeBorder = true;
   bool dualSideCodes = true;
   bool autoDateTime = true;
+  bool autoIncrementPartNumber = false;
+  bool autoIncrementSerialNumber = false;
   String symbology = 'data_matrix';
   String _scanValueSource = 'encoded_text';
   String labelSize = '100 × 30 mm';
@@ -128,6 +133,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       itemName,
       model,
       serial,
+      partIncrementBy,
+      serialIncrementBy,
       dr,
       pack,
       portLabel,
@@ -186,6 +193,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       itemName,
       model,
       serial,
+      partIncrementBy,
+      serialIncrementBy,
       dr,
       pack,
       quantity,
@@ -450,15 +459,16 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   bool _isValidScanValueSource(String source) =>
       _scanValueOptions.containsKey(source);
 
-  String get scanData {
+  String get _selectedScanValue {
     if (_scanValueSource.startsWith('dynamic:')) {
       final id = _scanValueSource.substring('dynamic:'.length);
-      final value =
-          _dynamicFields.where((field) => field.id == id).firstOrNull?.value ??
+      return _dynamicFields
+              .where((field) => field.id == id)
+              .firstOrNull
+              ?.value ??
           '';
-      return value.trim().isEmpty ? codeData : value;
     }
-    final value = switch (_scanValueSource) {
+    return switch (_scanValueSource) {
       'part_number' => partNumber.text,
       'item_name' => itemName.text,
       'item_model' => model.text,
@@ -471,6 +481,13 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       'date_time' => '${labelDate.text} ${labelTime.text}'.trim(),
       _ => codeData,
     };
+  }
+
+  bool get _scanDataUsesEncodedText =>
+      _scanValueSource == 'encoded_text' || _selectedScanValue.trim().isEmpty;
+
+  String get scanData {
+    final value = _selectedScanValue;
     return value.trim().isEmpty ? codeData : value;
   }
 
@@ -641,6 +658,16 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
         ),
         const SizedBox(height: 12),
         _field(partNumber, 'Part number', Icons.confirmation_number_outlined),
+        const SizedBox(height: 8),
+        _autoIncrementControl(
+          keyName: 'part-number',
+          fieldName: 'Part number',
+          enabled: autoIncrementPartNumber,
+          incrementController: partIncrementBy,
+          onChanged: (value) {
+            setState(() => autoIncrementPartNumber = value);
+          },
+        ),
         const SizedBox(height: 12),
         _field(itemName, 'Item name', Icons.inventory_2_outlined),
         const SizedBox(height: 12),
@@ -652,6 +679,16 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
             const SizedBox(width: 12),
             Expanded(child: _field(serial, 'Serial no.', Icons.numbers)),
           ],
+        ),
+        const SizedBox(height: 8),
+        _autoIncrementControl(
+          keyName: 'serial-number',
+          fieldName: 'Serial number',
+          enabled: autoIncrementSerialNumber,
+          incrementController: serialIncrementBy,
+          onChanged: (value) {
+            setState(() => autoIncrementSerialNumber = value);
+          },
         ),
         const SizedBox(height: 12),
         _dynamicFieldsEditor(context),
@@ -956,6 +993,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     final showCompanyName = _isVisible(LabelFieldKey.companyName);
     final showCompanyAddress = _isVisible(LabelFieldKey.companyAddress);
     final showPartNumber = _isVisible(LabelFieldKey.partNumber);
+    final showSerialNumber = _isVisible(LabelFieldKey.serialNumber);
     final showItemName = _isVisible(LabelFieldKey.itemName) && includeName;
     final showModel = _isVisible(LabelFieldKey.model);
     final showPort = _isVisible(LabelFieldKey.port) && portValue.isNotEmpty;
@@ -965,6 +1003,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     final companyFont = _fontSize(LabelFieldKey.companyName);
     final addressFont = _fontSize(LabelFieldKey.companyAddress);
     final partFont = _fontSize(LabelFieldKey.partNumber);
+    final serialFont = _fontSize(LabelFieldKey.serialNumber);
     final itemFont = _fontSize(LabelFieldKey.itemName);
     final modelFont = _fontSize(LabelFieldKey.model);
     final portFont = _fontSize(LabelFieldKey.port);
@@ -1206,6 +1245,26 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                       ),
                                     ),
                                   ),
+                                if (showSerialNumber)
+                                  _draggablePreviewTextFeature(
+                                    area: area,
+                                    element:
+                                        LabelLayoutElement.dualSerialNumber,
+                                    maxWidth: dualCenterWidth,
+                                    onChanged: _setLayoutPosition,
+                                    onEnd: _saveLabelLayout,
+                                    text:
+                                        'SERIAL NO: ${serial.text.trim().isEmpty ? '-' : serial.text.trim()}',
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: serialFont,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.15,
+                                    ),
+                                  ),
                                 if (showCodeData)
                                   _draggablePreviewTextFeature(
                                     area: area,
@@ -1367,6 +1426,22 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                           ),
                                         ),
                                       ),
+                                    ),
+                                  ),
+                                if (showSerialNumber)
+                                  _draggablePreviewTextFeature(
+                                    area: area,
+                                    element:
+                                        LabelLayoutElement.singleSerialNumber,
+                                    maxWidth: singleTextWidth,
+                                    onChanged: _setLayoutPosition,
+                                    onEnd: _saveLabelLayout,
+                                    text:
+                                        'SERIAL NO: ${serial.text.trim().isEmpty ? '-' : serial.text.trim()}',
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: serialFont,
                                     ),
                                   ),
                                 if (showDateTime)
@@ -1976,6 +2051,64 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
   );
 
+  Widget _autoIncrementControl({
+    required String keyName,
+    required String fieldName,
+    required bool enabled,
+    required TextEditingController incrementController,
+    required ValueChanged<bool> onChanged,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return AnimatedContainer(
+      key: ValueKey('$keyName-auto-increment-panel'),
+      duration: const Duration(milliseconds: 160),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: enabled
+            ? colors.primaryContainer.withValues(alpha: .28)
+            : colors.surfaceContainerHighest.withValues(alpha: .24),
+        border: Border.all(
+          color: enabled
+              ? colors.primary.withValues(alpha: .55)
+              : colors.outlineVariant,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          SwitchListTile.adaptive(
+            key: ValueKey('$keyName-auto-increment-switch'),
+            contentPadding: EdgeInsets.zero,
+            secondary: Icon(Icons.trending_up_rounded, color: colors.primary),
+            title: Text('Auto-increment $fieldName'),
+            subtitle: const Text(
+              'Create a new value for every label in Pack qty.',
+            ),
+            value: enabled,
+            onChanged: onChanged,
+          ),
+          if (enabled)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: TextField(
+                key: ValueKey('$keyName-increment-by'),
+                controller: incrementController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(
+                  labelText: 'Increment by',
+                  prefixIcon: Icon(Icons.add_circle_outline_rounded),
+                  helperText:
+                      'The first label keeps the entered value; leading zeroes are preserved.',
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _dropdown(
     String label,
     String value,
@@ -2272,6 +2405,12 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
             keyName: LabelFieldKey.partNumber,
             label: 'Part number',
             icon: Icons.confirmation_number,
+            supportsFont: true,
+          ),
+          (
+            keyName: LabelFieldKey.serialNumber,
+            label: 'Serial number',
+            icon: Icons.numbers,
             supportsFont: true,
           ),
           (
@@ -2674,8 +2813,42 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     }
   }
 
+  int _incrementStep(TextEditingController controller) {
+    final value = int.tryParse(controller.text.trim());
+    return value != null && value > 0 ? value : 1;
+  }
+
+  bool _validateAutoIncrementSettings() {
+    if (autoIncrementPartNumber) {
+      if (!RegExp(r'\d').hasMatch(partNumber.text)) {
+        _notice('Part number needs at least one digit to auto-increment');
+        return false;
+      }
+      final step = int.tryParse(partIncrementBy.text.trim());
+      if (step == null || step < 1) {
+        _notice('Part number increment must be 1 or greater');
+        return false;
+      }
+    }
+    if (autoIncrementSerialNumber) {
+      if (!RegExp(r'\d').hasMatch(serial.text)) {
+        _notice('Serial number needs at least one digit to auto-increment');
+        return false;
+      }
+      final step = int.tryParse(serialIncrementBy.text.trim());
+      if (step == null || step < 1) {
+        _notice('Serial number increment must be 1 or greater');
+        return false;
+      }
+    }
+    return true;
+  }
+
   BrowserLabelDocument _getDocument(bool withName) {
     final size = sizes[labelSize]!;
+    final now = DateTime.now();
+    final encodedYearMonth =
+        '${(now.year % 100).toString().padLeft(2, '0')}${now.month.toString().padLeft(2, '0')}';
     return BrowserLabelDocument(
       title: 'PART NO: ${partNumber.text}',
       content: scanData,
@@ -2685,6 +2858,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       itemName: withName ? itemName.text : '',
       model: model.text,
       partNumber: partNumber.text.trim(),
+      serialNumber: serial.text.trim(),
       port: portLabel.text.trim(),
       dateText: labelDate.text.trim(),
       timeText: labelTime.text.trim(),
@@ -2700,6 +2874,15 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       resolvedLayoutRects: Map.of(_previewElementRects),
       resolvedDynamicRects: Map.of(_previewDynamicRects),
       previewCanvasHeight: _previewCanvasHeight,
+      scanValueSource: _scanDataUsesEncodedText
+          ? 'encoded_text'
+          : _scanValueSource,
+      encodedDrCode: dr.text.trim(),
+      encodedYearMonth: encodedYearMonth,
+      autoIncrementPartNumber: autoIncrementPartNumber,
+      partNumberIncrement: _incrementStep(partIncrementBy),
+      autoIncrementSerialNumber: autoIncrementSerialNumber,
+      serialNumberIncrement: _incrementStep(serialIncrementBy),
     );
   }
 
@@ -2737,6 +2920,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       _notice('Select or enter a part first');
       return;
     }
+    if (!_validateAutoIncrementSettings()) return;
     setState(() => busy = true);
     try {
       if (autoDateTime) {
@@ -2825,6 +3009,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       _notice('Select a part and enter a valid print quantity');
       return;
     }
+    if (!_validateAutoIncrementSettings()) return;
     final isWindows = PlatformCapabilities.current().isWindows;
     final windowsAction = isWindows ? await _chooseWindowsPrintAction() : null;
     if (isWindows && windowsAction == null) return;
@@ -2877,6 +3062,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       controller.clear();
     }
     serial.text = '001';
+    partIncrementBy.text = '1';
+    serialIncrementBy.text = '1';
+    autoIncrementPartNumber = false;
+    autoIncrementSerialNumber = false;
     dr.text = 'NR';
     pack.text = '1';
     quantity.text = '1';
