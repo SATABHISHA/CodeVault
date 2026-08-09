@@ -54,7 +54,7 @@ The domain supports ZPL, TSPL, EPL, CPCL, GoDEX, and raster language declaration
 ```powershell
 flutter test
 flutter analyze
-flutter build windows --release
+.\scripts\build_windows_installer.ps1
 ```
 
-The release output is under `build\windows\x64\runner\Release`. The Inno Setup definition in `windows\installer\codevault.iss` creates Start Menu/Desktop shortcuts, an uninstaller, and leaves `%LOCALAPPDATA%\Ahanova\CodeVault` untouched during uninstall so company data is not silently destroyed.
+The release output is under `build\windows\x64\runner\Release`, and the shareable installer is written to `dist\windows`. The Inno Setup definition in `windows\installer\codevault.iss` creates Start Menu/Desktop shortcuts, an uninstaller, and leaves `%LOCALAPPDATA%\Ahanova\CodeVault` untouched during uninstall so company data is not silently destroyed. See `docs\WINDOWS_INSTALLER.md` for prerequisites, versioning, icon maintenance, and the Windows x86 limitation.

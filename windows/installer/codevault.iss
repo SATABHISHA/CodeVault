@@ -1,5 +1,10 @@
 #define AppName "CodeVault"
-#define AppVersion "1.0.0"
+#ifndef AppVersion
+	#define AppVersion "1.0.0"
+#endif
+#ifndef AppBuild
+	#define AppBuild "1"
+#endif
 #define AppPublisher "Ahanova AI Technologies Pvt. Ltd."
 #define AppExeName "codevault.exe"
 
@@ -12,13 +17,16 @@ AppPublisherURL=https://ahanova.in
 AppSupportURL=mailto:wecare@ahanova.in
 DefaultDirName={autopf}\Ahanova\CodeVault
 DefaultGroupName=CodeVault
+OutputDir=..\..\dist\windows
 OutputBaseFilename=CodeVault-{#AppVersion}-Windows-x64
+SetupIconFile=..\runner\resources\app_icon.ico
 Compression=lzma2
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=admin
 UninstallDisplayIcon={app}\{#AppExeName}
+VersionInfoVersion={#AppVersion}.{#AppBuild}
 
 [Files]
 Source: "..\..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
