@@ -27,7 +27,6 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
   final time = TextEditingController();
   final pack = TextEditingController(text: '1');
   final quantity = TextEditingController(text: '1');
-  bool includeName = true;
   bool dualSideCodes = true;
   bool autoDateTime = true;
   String format = 'Barcode';
@@ -325,16 +324,11 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
                           onPressed: _testPrint,
                           child: const Text('Test print'),
                         ),
-                        FilledButton.tonalIcon(
-                          onPressed: () => _print(withName: false),
-                          icon: const Icon(Icons.print_disabled),
-                          label: const Text('Print without name'),
-                        ),
                         FilledButton.icon(
                           key: const Key('offline-print'),
-                          onPressed: () => _print(withName: true),
+                          onPressed: _print,
                           icon: const Icon(Icons.print),
-                          label: const Text('Print with name'),
+                          label: const Text('Print'),
                         ),
                       ],
                     ),
@@ -374,9 +368,8 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
     if (mounted) setState(() => status = 'Test successful');
   }
 
-  Future<void> _print({bool? withName}) async {
+  Future<void> _print() async {
     final copies = int.tryParse(quantity.text) ?? 0;
-    final include = withName ?? includeName;
     final modelLine = port.text.trim().isEmpty
         ? 'MODEL:${model.text}'
         : 'MODEL:${model.text} ${port.text.trim()}';
@@ -386,9 +379,8 @@ class _WindowsOperationsScreenState extends State<WindowsOperationsScreen> {
     final receipt = await printer.print(
       PrintRequest(
         jobId: const Uuid().v4(),
-        content: include
-            ? '${company.text}\n$modelLine\nDATE:${date.text} TIME:${time.text}\nPART:${part.text}\n$content'
-            : content,
+        content:
+            '${company.text}\n$modelLine\nDATE:${date.text} TIME:${time.text}\nPART:${part.text}\n$content',
         copies: copies,
       ),
     );

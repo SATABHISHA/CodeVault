@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -106,6 +107,12 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   final Map<LabelLayoutElement, LabelLayoutRect> _previewElementRects = {};
   final Map<String, LabelLayoutRect> _previewDynamicRects = {};
   double? _previewCanvasHeight;
+  String? _selectedPreviewKey;
+  String? _activePreviewKey;
+  final Map<String, GlobalKey> _previewInteractionKeys = {};
+  Offset? _moveLastGlobal;
+  Offset? _rotationCenterGlobal;
+  double _rotationLastPointerAngle = 0;
   @override
   void initState() {
     super.initState();
@@ -1067,132 +1074,87 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     ),
                                   ),
                                 if (showCompanyName)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element: LabelLayoutElement.dualCompanyName,
-                                    elementSize: Size(
-                                      dualCenterWidth,
-                                      dualLineHeight,
-                                    ),
+                                    maxWidth: dualCenterWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: dualCenterWidth,
-                                      child: Text(
-                                        companyName.text.trim().isEmpty
-                                            ? 'COMPANY NAME'
-                                            : companyName.text
-                                                  .trim()
-                                                  .toUpperCase(),
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily:
-                                              LabelTypography.fontFamily,
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: companyFont,
-                                          letterSpacing:
-                                              LabelTypography.companyTracking,
-                                          height: 1.05,
-                                        ),
-                                      ),
+                                    text: companyName.text.trim().isEmpty
+                                        ? 'COMPANY NAME'
+                                        : companyName.text.trim().toUpperCase(),
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: companyFont,
+                                      letterSpacing:
+                                          LabelTypography.companyTracking,
+                                      height: 1.05,
                                     ),
                                   ),
                                 if (showModel)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element: LabelLayoutElement.dualModel,
-                                    elementSize: Size(
-                                      dualModelWidth,
-                                      dualLineHeight,
-                                    ),
+                                    maxWidth: dualModelWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: dualModelWidth,
-                                      child: Text(
+                                    text:
                                         'MODEL: ${model.text.trim().isEmpty ? '-' : model.text.trim().toUpperCase()}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily:
-                                              LabelTypography.fontFamily,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: modelFont,
-                                          letterSpacing:
-                                              LabelTypography.textTracking,
-                                          height: 1.15,
-                                        ),
-                                      ),
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: modelFont,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.15,
                                     ),
                                   ),
                                 if (showPort)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element: LabelLayoutElement.dualPort,
-                                    elementSize: Size(
-                                      dualPortWidth,
-                                      dualLineHeight,
-                                    ),
+                                    maxWidth: dualPortWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: dualPortWidth,
-                                      child: Text(
-                                        portLabel.text.trim().toUpperCase(),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily:
-                                              LabelTypography.fontFamily,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: portFont,
-                                          letterSpacing:
-                                              LabelTypography.textTracking,
-                                          height: 1.15,
-                                        ),
-                                      ),
+                                    text: portLabel.text.trim().toUpperCase(),
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: portFont,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.15,
                                     ),
                                   ),
                                 if (showDateTime)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element: LabelLayoutElement.dualDateTime,
-                                    elementSize: Size(
-                                      dualCenterWidth,
-                                      dualLineHeight,
-                                    ),
+                                    maxWidth: dualCenterWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: dualCenterWidth,
-                                      child: Text(
+                                    text:
                                         'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}    TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily:
-                                              LabelTypography.fontFamily,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: dateTimeFont,
-                                          letterSpacing:
-                                              LabelTypography.textTracking,
-                                          height: 1.15,
-                                        ),
-                                      ),
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: dateTimeFont,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.15,
                                     ),
                                   ),
                                 if (showPartNumber)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element: LabelLayoutElement.dualPartNumber,
-                                    elementSize: Size(
-                                      dualCenterWidth,
-                                      dualLineHeight,
-                                    ),
+                                    maxWidth: dualCenterWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     child: SizedBox(
@@ -1215,13 +1177,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     ),
                                   ),
                                 if (showItemName)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element: LabelLayoutElement.dualItemName,
-                                    elementSize: Size(
-                                      dualCenterWidth,
-                                      dualLineHeight,
-                                    ),
+                                    maxWidth: dualCenterWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     child: SizedBox(
@@ -1246,13 +1205,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     ),
                                   ),
                                 if (showCodeData)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element: LabelLayoutElement.dualCodeData,
-                                    elementSize: Size(
-                                      dualCenterWidth,
-                                      dualLineHeight,
-                                    ),
+                                    maxWidth: dualCenterWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     child: SizedBox(
@@ -1292,14 +1248,11 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                   ),
                               ] else ...[
                                 if (showCompanyName)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element:
                                         LabelLayoutElement.singleCompanyName,
-                                    elementSize: Size(
-                                      singleTextWidth,
-                                      singleLineHeight,
-                                    ),
+                                    maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     child: SizedBox(
@@ -1321,14 +1274,11 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     ),
                                   ),
                                 if (showCompanyAddress)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element:
                                         LabelLayoutElement.singleCompanyAddress,
-                                    elementSize: Size(
-                                      singleTextWidth,
-                                      singleLineHeight,
-                                    ),
+                                    maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     child: SizedBox(
@@ -1349,14 +1299,11 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     ),
                                   ),
                                 if (showPartNumber)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element:
                                         LabelLayoutElement.singlePartNumber,
-                                    elementSize: Size(
-                                      singleTextWidth,
-                                      singleLineHeight,
-                                    ),
+                                    maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     child: SizedBox(
@@ -1374,13 +1321,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     ),
                                   ),
                                 if (showItemName)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element: LabelLayoutElement.singleItemName,
-                                    elementSize: Size(
-                                      singleTextWidth,
-                                      singleLineHeight,
-                                    ),
+                                    maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     child: SizedBox(
@@ -1397,13 +1341,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     ),
                                   ),
                                 if (showModel || showPort)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element: LabelLayoutElement.singleModelPort,
-                                    elementSize: Size(
-                                      singleTextWidth,
-                                      singleLineHeight,
-                                    ),
+                                    maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     child: SizedBox(
@@ -1427,13 +1368,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     ),
                                   ),
                                 if (showDateTime)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element: LabelLayoutElement.singleDateTime,
-                                    elementSize: Size(
-                                      singleTextWidth,
-                                      singleLineHeight,
-                                    ),
+                                    maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     child: SizedBox(
@@ -1466,13 +1404,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     ),
                                   ),
                                 if (showCodeData)
-                                  _draggablePreviewFeature(
+                                  _draggablePreviewTextFeature(
                                     area: area,
                                     element: LabelLayoutElement.singleCodeData,
-                                    elementSize: Size(
-                                      singleTextWidth,
-                                      singleLineHeight,
-                                    ),
+                                    maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     child: SizedBox(
@@ -1493,15 +1428,26 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                               for (final field in _dynamicFields)
                                 if (field.visible &&
                                     field.value.trim().isNotEmpty)
-                                  _draggablePositionedFeature(
+                                  _draggablePositionedTextFeature(
                                     area: area,
-                                    elementSize: Size(
+                                    maxWidth: dualMode
+                                        ? dualCenterWidth
+                                        : singleTextWidth,
+                                    positioningSize: Size(
                                       dualMode
                                           ? dualCenterWidth
                                           : singleTextWidth,
                                       dualMode
                                           ? dualLineHeight
                                           : singleLineHeight,
+                                    ),
+                                    text: '${field.label}: ${field.value}',
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontFamily: LabelTypography.fontFamily,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: field.fontSize,
+                                      height: 1.1,
                                     ),
                                     currentPosition: () {
                                       final current = _dynamicFields.firstWhere(
@@ -1510,6 +1456,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                       return LabelLayoutPosition(
                                         x: current.x,
                                         y: current.y,
+                                        rotation: current.rotation,
                                       );
                                     },
                                     onChanged: (position) =>
@@ -1518,23 +1465,13 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                           (current) => current.copyWith(
                                             x: position.x,
                                             y: position.y,
+                                            rotation: position.rotation,
                                           ),
                                         ),
                                     onEnd: () {},
+                                    interactionKey: 'dynamic:${field.id}',
                                     onGeometry: (rect) =>
                                         _previewDynamicRects[field.id] = rect,
-                                    child: Text(
-                                      '${field.label}: ${field.value}',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: Colors.black,
-                                        fontFamily: LabelTypography.fontFamily,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: field.fontSize,
-                                        height: 1.1,
-                                      ),
-                                    ),
                                   ),
                             ],
                           );
@@ -1546,6 +1483,20 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
               );
             },
           ),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.touch_app_outlined, size: 15),
+              SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  'Drag to move. Select a label, then drag its rotate handle.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           const SizedBox(height: 14),
           Text(
             '${profile.$1.toInt()} × ${profile.$2.toInt()} mm • ${symbology.replaceAll('_', ' ').toUpperCase()} • $port',
@@ -1572,16 +1523,11 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                 icon: const Icon(Icons.visibility_outlined),
                 label: const Text('Display PDF'),
               ),
-              FilledButton.tonalIcon(
-                onPressed: busy ? null : () => _print(withName: false),
-                icon: const Icon(Icons.print_disabled),
-                label: const Text('Print without name'),
-              ),
               FilledButton.icon(
                 key: const Key('production-print'),
-                onPressed: busy ? null : () => _print(withName: true),
+                onPressed: busy ? null : _print,
                 icon: const Icon(Icons.print),
-                label: const Text('Print with name'),
+                label: const Text('Print'),
               ),
             ],
           ),
@@ -1640,10 +1586,117 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     });
   }
 
+  Size _singleLineTextSize({
+    required String text,
+    required TextStyle style,
+    required double maxWidth,
+  }) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: DefaultTextStyle.of(context).style.merge(style),
+      ),
+      maxLines: 1,
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout(maxWidth: maxWidth);
+    return Size(
+      math.max(1, painter.width.ceilToDouble()),
+      math.max(1, painter.height.ceilToDouble()),
+    );
+  }
+
+  Widget _draggablePreviewTextFeature({
+    required Size area,
+    required LabelLayoutElement element,
+    required double maxWidth,
+    String? text,
+    TextStyle? style,
+    Widget? child,
+    required void Function(LabelLayoutElement, LabelLayoutPosition) onChanged,
+    required Future<void> Function({bool notify}) onEnd,
+    TextAlign textAlign = TextAlign.left,
+  }) {
+    final suppliedText = switch (child) {
+      Text value => value,
+      SizedBox value when value.child is Text => value.child! as Text,
+      _ => null,
+    };
+    final resolvedText = text ?? suppliedText?.data ?? '';
+    final resolvedStyle = style ?? suppliedText?.style ?? const TextStyle();
+    final elementSize = _singleLineTextSize(
+      text: resolvedText,
+      style: resolvedStyle,
+      maxWidth: maxWidth,
+    );
+    final legacyHeight = element.name.startsWith('dual')
+        ? math.max(13.0, area.height * .075)
+        : math.max(14.0, area.height * .08);
+    return _draggablePreviewFeature(
+      area: area,
+      element: element,
+      elementSize: elementSize,
+      positioningSize: Size(maxWidth, legacyHeight),
+      onChanged: onChanged,
+      onEnd: onEnd,
+      child: SizedBox.fromSize(
+        size: elementSize,
+        child:
+            suppliedText ??
+            Text(
+              resolvedText,
+              maxLines: 1,
+              overflow: TextOverflow.clip,
+              textAlign: textAlign,
+              style: resolvedStyle,
+            ),
+      ),
+    );
+  }
+
+  Widget _draggablePositionedTextFeature({
+    required Size area,
+    required double maxWidth,
+    required String text,
+    required TextStyle style,
+    required LabelLayoutPosition Function() currentPosition,
+    required ValueChanged<LabelLayoutPosition> onChanged,
+    required VoidCallback onEnd,
+    required String interactionKey,
+    ValueChanged<LabelLayoutRect>? onGeometry,
+    Size? positioningSize,
+  }) {
+    final elementSize = _singleLineTextSize(
+      text: text,
+      style: style,
+      maxWidth: maxWidth,
+    );
+    return _draggablePositionedFeature(
+      area: area,
+      elementSize: elementSize,
+      positioningSize: positioningSize,
+      currentPosition: currentPosition,
+      onChanged: onChanged,
+      onEnd: onEnd,
+      interactionKey: interactionKey,
+      onGeometry: onGeometry,
+      child: SizedBox.fromSize(
+        size: elementSize,
+        child: Text(
+          text,
+          maxLines: 1,
+          overflow: TextOverflow.clip,
+          style: style,
+        ),
+      ),
+    );
+  }
+
   Widget _draggablePreviewFeature({
     required Size area,
     required LabelLayoutElement element,
     required Size elementSize,
+    Size? positioningSize,
     required void Function(LabelLayoutElement, LabelLayoutPosition) onChanged,
     required Future<void> Function({bool notify}) onEnd,
     required Widget child,
@@ -1651,9 +1704,11 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     return _draggablePositionedFeature(
       area: area,
       elementSize: elementSize,
+      positioningSize: positioningSize,
       currentPosition: () => _labelLayout.positionFor(element),
       onChanged: (position) => onChanged(element, position),
       onEnd: () => onEnd(),
+      interactionKey: element.name,
       onGeometry: (rect) => _previewElementRects[element] = rect,
       child: child,
     );
@@ -1662,19 +1717,95 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   Widget _draggablePositionedFeature({
     required Size area,
     required Size elementSize,
+    Size? positioningSize,
     required LabelLayoutPosition Function() currentPosition,
     required ValueChanged<LabelLayoutPosition> onChanged,
     required VoidCallback onEnd,
+    required String interactionKey,
     ValueChanged<LabelLayoutRect>? onGeometry,
     required Widget child,
   }) {
-    final freeX = math.max(0.0, area.width - elementSize.width);
-    final freeY = math.max(0.0, area.height - elementSize.height);
-    final maxLeft = math.max(0.0, area.width - 8.0);
-    final maxNormalizedX = freeX <= 0 ? 0.0 : maxLeft / freeX;
+    final positionSize = positioningSize ?? elementSize;
+    final freeX = math.max(0.0, area.width - positionSize.width);
+    final freeY = math.max(0.0, area.height - positionSize.height);
     final normalized = currentPosition();
     final left = freeX * normalized.x;
     final top = freeY * normalized.y;
+    final hitWidth = elementSize.width;
+    final selected = _selectedPreviewKey == interactionKey;
+    final interactionWidgetKey = _previewInteractionKeys.putIfAbsent(
+      interactionKey,
+      GlobalKey.new,
+    );
+    final cosAngle = math.cos(normalized.rotation);
+    final sinAngle = math.sin(normalized.rotation);
+    final handleLocalOffset = Offset(
+      (elementSize.width / 2) + 12,
+      -(elementSize.height / 2) - 12,
+    );
+    final unconstrainedHandleCenter = Offset(
+      left +
+          (elementSize.width / 2) +
+          (handleLocalOffset.dx * cosAngle) -
+          (handleLocalOffset.dy * sinAngle),
+      top +
+          (elementSize.height / 2) +
+          (handleLocalOffset.dx * sinAngle) +
+          (handleLocalOffset.dy * cosAngle),
+    );
+    final handleCenter = Offset(
+      unconstrainedHandleCenter.dx.clamp(16.0, area.width - 16.0),
+      unconstrainedHandleCenter.dy.clamp(16.0, area.height - 16.0),
+    );
+
+    ({double minLeft, double maxLeft, double minTop, double maxTop})
+    movementBounds(double rotation) {
+      final cosRotation = math.cos(rotation).abs();
+      final sinRotation = math.sin(rotation).abs();
+      final rotatedWidth =
+          (elementSize.width * cosRotation) +
+          (elementSize.height * sinRotation);
+      final rotatedHeight =
+          (elementSize.width * sinRotation) +
+          (elementSize.height * cosRotation);
+      final minLeft = (rotatedWidth - elementSize.width) / 2;
+      final minTop = (rotatedHeight - elementSize.height) / 2;
+      return (
+        minLeft: minLeft,
+        maxLeft: math.max(
+          minLeft,
+          area.width - ((elementSize.width + rotatedWidth) / 2),
+        ),
+        minTop: minTop,
+        maxTop: math.max(
+          minTop,
+          area.height - ((elementSize.height + rotatedHeight) / 2),
+        ),
+      );
+    }
+
+    LabelLayoutPosition boundedPosition({
+      required LabelLayoutPosition current,
+      required double rotation,
+      double dx = 0,
+      double dy = 0,
+    }) {
+      final bounds = movementBounds(rotation);
+      final boundedLeft = (freeX * current.x + dx).clamp(
+        bounds.minLeft,
+        bounds.maxLeft,
+      );
+      final boundedTop = (freeY * current.y + dy).clamp(
+        bounds.minTop,
+        bounds.maxTop,
+      );
+      return LabelLayoutPosition(
+        x: freeX <= 0 ? 0 : boundedLeft / freeX,
+        y: freeY <= 0 ? 0 : boundedTop / freeY,
+        rotation: rotation,
+      );
+    }
+
     onGeometry?.call(
       LabelLayoutRect(
         left: area.width <= 0 ? 0 : left / area.width,
@@ -1684,36 +1815,148 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       ),
     );
 
-    return Positioned(
-      left: left,
-      top: top,
-      child: MouseRegion(
-        cursor: SystemMouseCursors.grab,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onPanUpdate: (details) {
-            final current = currentPosition();
-            onChanged(
-              LabelLayoutPosition(
-                x: freeX <= 0
-                    ? 0
-                    : (current.x + (details.delta.dx / freeX)).clamp(
-                        0.0,
-                        maxNormalizedX,
+    return Positioned.fill(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: left,
+            top: top,
+            child: Transform.rotate(
+              angle: normalized.rotation,
+              alignment: Alignment.center,
+              transformHitTests: true,
+              child: MouseRegion(
+                cursor: _activePreviewKey == interactionKey
+                    ? SystemMouseCursors.grabbing
+                    : SystemMouseCursors.grab,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () =>
+                      setState(() => _selectedPreviewKey = interactionKey),
+                  onPanStart: (details) {
+                    _moveLastGlobal = details.globalPosition;
+                    setState(() {
+                      _selectedPreviewKey = interactionKey;
+                      _activePreviewKey = interactionKey;
+                    });
+                  },
+                  onPanUpdate: (details) {
+                    final lastGlobal = _moveLastGlobal;
+                    final delta = lastGlobal == null
+                        ? Offset.zero
+                        : details.globalPosition - lastGlobal;
+                    _moveLastGlobal = details.globalPosition;
+                    final current = currentPosition();
+                    onChanged(
+                      boundedPosition(
+                        current: current,
+                        rotation: current.rotation,
+                        dx: delta.dx,
+                        dy: delta.dy,
                       ),
-                y: freeY <= 0
-                    ? 0
-                    : (current.y + (details.delta.dy / freeY)).clamp(0.0, 1.0),
+                    );
+                  },
+                  onPanEnd: (_) {
+                    _moveLastGlobal = null;
+                    setState(() => _activePreviewKey = null);
+                    onEnd();
+                  },
+                  onPanCancel: () {
+                    _moveLastGlobal = null;
+                    setState(() => _activePreviewKey = null);
+                  },
+                  child: SizedBox(
+                    key: interactionWidgetKey,
+                    width: hitWidth,
+                    height: elementSize.height,
+                    child: child,
+                  ),
+                ),
               ),
-            );
-          },
-          onPanEnd: (_) => onEnd(),
-          child: SizedBox(
-            width: elementSize.width,
-            height: elementSize.height,
-            child: child,
+            ),
           ),
-        ),
+          if (selected)
+            Positioned(
+              left: handleCenter.dx - 16,
+              top: handleCenter.dy - 16,
+              child: MouseRegion(
+                cursor: SystemMouseCursors.resizeUpLeftDownRight,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onPanStart: (details) {
+                    final renderObject = interactionWidgetKey.currentContext
+                        ?.findRenderObject();
+                    if (renderObject is RenderBox) {
+                      _rotationCenterGlobal = renderObject.localToGlobal(
+                        renderObject.size.center(Offset.zero),
+                      );
+                      final offset =
+                          details.globalPosition - _rotationCenterGlobal!;
+                      _rotationLastPointerAngle = math.atan2(
+                        offset.dy,
+                        offset.dx,
+                      );
+                    }
+                    setState(
+                      () => _activePreviewKey = '$interactionKey:rotate',
+                    );
+                  },
+                  onPanUpdate: (details) {
+                    final center = _rotationCenterGlobal;
+                    if (center == null) return;
+                    final offset = details.globalPosition - center;
+                    final pointerAngle = math.atan2(offset.dy, offset.dx);
+                    var angleDelta = pointerAngle - _rotationLastPointerAngle;
+                    while (angleDelta > math.pi) {
+                      angleDelta -= math.pi * 2;
+                    }
+                    while (angleDelta < -math.pi) {
+                      angleDelta += math.pi * 2;
+                    }
+                    _rotationLastPointerAngle = pointerAngle;
+                    final current = currentPosition();
+                    onChanged(
+                      boundedPosition(
+                        current: current,
+                        rotation: current.rotation + angleDelta,
+                      ),
+                    );
+                  },
+                  onPanEnd: (_) {
+                    _rotationCenterGlobal = null;
+                    setState(() => _activePreviewKey = null);
+                    onEnd();
+                  },
+                  onPanCancel: () {
+                    _rotationCenterGlobal = null;
+                    setState(() => _activePreviewKey = null);
+                  },
+                  child: SizedBox.square(
+                    dimension: 32,
+                    child: Center(
+                      child: Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          shape: BoxShape.circle,
+                          boxShadow: const [
+                            BoxShadow(color: Colors.black26, blurRadius: 3),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.rotate_right,
+                          size: 14,
+                          color: Theme.of(context).colorScheme.onPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -2467,6 +2710,26 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     );
   }
 
+  Future<Uint8List> _generatePrintPdf(
+    BrowserLabelDocument document,
+    PdfPageFormat format,
+  ) {
+    final safeInset = 3 * PdfPageFormat.mm;
+    final labelWidth = document.widthMm * PdfPageFormat.mm;
+    final labelHeight = document.heightMm * PdfPageFormat.mm;
+    final canInsetHorizontally = format.width >= labelWidth + (safeInset * 2);
+    final canInsetVertically = format.height >= labelHeight + (safeInset * 2);
+    return const BrowserPdfGenerator().generate(
+      document,
+      pageFormat: format.applyMargin(
+        left: canInsetHorizontally ? safeInset : format.marginLeft,
+        top: canInsetVertically ? safeInset : format.marginTop,
+        right: canInsetHorizontally ? safeInset : format.marginRight,
+        bottom: canInsetVertically ? safeInset : format.marginBottom,
+      ),
+    );
+  }
+
   Future<void> _generate({bool? withName}) async {
     if (partNumber.text.trim().isEmpty) {
       _notice('Select or enter a part first');
@@ -2490,7 +2753,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     }
   }
 
-  Future<void> _print({bool? withName}) async {
+  Future<void> _print() async {
     final copies = int.tryParse(quantity.text) ?? 0;
     if (partNumber.text.trim().isEmpty || copies < 1) {
       _notice('Select a part and enter a valid print quantity');
@@ -2501,38 +2764,37 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       if (autoDateTime) {
         _stampNow();
       }
-      final document = _getDocument(withName ?? includeName);
-      if (_selectedPrinter != null) {
+      final document = _getDocument(true);
+      final filename = 'codevault-${partNumber.text}.pdf';
+      final isWindows = PlatformCapabilities.current().isWindows;
+      if (isWindows && _availablePrinters.isNotEmpty) {
+        final submitted = await Printing.layoutPdf(
+          name: filename,
+          onLayout: (format) => _generatePrintPdf(document, format),
+        );
+        if (!submitted) {
+          _notice('Printing cancelled');
+          return;
+        }
+      } else if (isWindows) {
+        final bytes = await const BrowserPdfGenerator().generate(
+          document,
+          pageFormat: _displayPdfPageFormat,
+        );
+        await gateway.download(bytes, filename);
+        _notice('No printer is available. The label was saved as a PDF');
+        return;
+      } else if (_selectedPrinter != null) {
         await Printing.directPrintPdf(
           printer: _selectedPrinter!,
-          onLayout: (format) {
-            final safeInset = 3 * PdfPageFormat.mm;
-            final labelWidth = document.widthMm * PdfPageFormat.mm;
-            final labelHeight = document.heightMm * PdfPageFormat.mm;
-            final canInsetHorizontally =
-                format.width >= labelWidth + (safeInset * 2);
-            final canInsetVertically =
-                format.height >= labelHeight + (safeInset * 2);
-            return const BrowserPdfGenerator().generate(
-              document,
-              pageFormat: format.applyMargin(
-                left: canInsetHorizontally ? safeInset : format.marginLeft,
-                top: canInsetVertically ? safeInset : format.marginTop,
-                right: canInsetHorizontally ? safeInset : format.marginRight,
-                bottom: canInsetVertically ? safeInset : format.marginBottom,
-              ),
-            );
-          },
+          onLayout: (format) => _generatePrintPdf(document, format),
         );
       } else {
         final bytes = await const BrowserPdfGenerator().generate(
           document,
           pageFormat: _displayPdfPageFormat,
         );
-        await gateway.showPrintDialog(
-          bytes,
-          'codevault-${partNumber.text}.pdf',
-        );
+        await gateway.showPrintDialog(bytes, filename);
       }
       ref.read(productionActivityProvider.notifier).recordPrint(copies);
       _notice('$copies label${copies == 1 ? '' : 's'} sent to print');

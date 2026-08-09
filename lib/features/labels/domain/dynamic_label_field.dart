@@ -11,6 +11,7 @@ class DynamicLabelField {
     this.fontSize = 10,
     this.x = .24,
     this.y = .74,
+    this.rotation = 0,
   });
 
   final String id;
@@ -20,6 +21,7 @@ class DynamicLabelField {
   final double fontSize;
   final double x;
   final double y;
+  final double rotation;
 
   DynamicLabelField copyWith({
     String? label,
@@ -28,6 +30,7 @@ class DynamicLabelField {
     double? fontSize,
     double? x,
     double? y,
+    double? rotation,
   }) => DynamicLabelField(
     id: id,
     label: label ?? this.label,
@@ -37,8 +40,11 @@ class DynamicLabelField {
       LabelFieldConfig.minFontSize,
       LabelFieldConfig.maxFontSize,
     ),
-    x: (x ?? this.x).clamp(0.0, 20.0),
-    y: (y ?? this.y).clamp(0.0, 1.0),
+    x: (x ?? this.x).clamp(-20.0, 20.0),
+    y: (y ?? this.y).clamp(-20.0, 20.0),
+    rotation: (rotation ?? this.rotation).isFinite
+        ? (rotation ?? this.rotation)
+        : 0,
   );
 
   Map<String, dynamic> toJson() => {
@@ -49,6 +55,7 @@ class DynamicLabelField {
     'font_size': fontSize,
     'x': x,
     'y': y,
+    'rotation': rotation,
   };
 
   static DynamicLabelField? fromJson(Object? raw, {int index = 0}) {
@@ -61,6 +68,7 @@ class DynamicLabelField {
     final size = json['font_size'];
     final x = json['x'];
     final y = json['y'];
+    final rotation = json['rotation'];
     return DynamicLabelField(
       id: id,
       label: label,
@@ -69,10 +77,11 @@ class DynamicLabelField {
       fontSize: (size is num ? size.toDouble() : 10.0)
           .clamp(LabelFieldConfig.minFontSize, LabelFieldConfig.maxFontSize)
           .toDouble(),
-      x: (x is num ? x.toDouble() : .24).clamp(0.0, 20.0).toDouble(),
+      x: (x is num ? x.toDouble() : .24).clamp(-20.0, 20.0).toDouble(),
       y: (y is num ? y.toDouble() : .74 + (index * .075))
-          .clamp(0.0, 1.0)
+          .clamp(-20.0, 20.0)
           .toDouble(),
+      rotation: rotation is num ? rotation.toDouble() : 0,
     );
   }
 

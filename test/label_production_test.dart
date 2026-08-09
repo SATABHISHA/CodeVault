@@ -61,6 +61,7 @@ void main() {
         fontSize: 12,
         x: .62,
         y: .35,
+        rotation: .75,
       ),
       DynamicLabelField(
         id: 'hidden',
@@ -77,6 +78,7 @@ void main() {
     expect(restored.first.fontSize, 12);
     expect(restored.first.x, .62);
     expect(restored.first.y, .35);
+    expect(restored.first.rotation, .75);
     expect(restored.last.visible, isFalse);
 
     final bytes = await const BrowserPdfGenerator().generate(
@@ -112,9 +114,20 @@ void main() {
   });
 
   test('layout positions preserve extended horizontal dragging', () {
-    const position = LabelLayoutPosition(x: 1.75, y: .5);
+    const position = LabelLayoutPosition(x: 1.75, y: .5, rotation: 1.2);
     expect(position.clamp().x, 1.75);
     expect(position.clamp().y, .5);
+    expect(position.clamp().rotation, 1.2);
+
+    const rotatedEdge = LabelLayoutPosition(x: -.12, y: -.08, rotation: 1.57);
+    expect(rotatedEdge.clamp().x, -.12);
+    expect(rotatedEdge.clamp().y, -.08);
+  });
+
+  test('PDF rotation preserves the live preview direction', () {
+    expect(pdfRotationFromPreview(1.2), -1.2);
+    expect(pdfRotationFromPreview(-.75), .75);
+    expect(pdfRotationFromPreview(0), 0);
   });
 
   test('native PDF honors printer margins without scaling labels', () async {

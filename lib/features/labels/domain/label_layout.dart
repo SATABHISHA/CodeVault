@@ -35,24 +35,40 @@ class LabelLayoutRect {
 }
 
 class LabelLayoutPosition {
-  const LabelLayoutPosition({required this.x, required this.y});
+  const LabelLayoutPosition({
+    required this.x,
+    required this.y,
+    this.rotation = 0,
+  });
 
   final double x;
   final double y;
+  final double rotation;
 
   LabelLayoutPosition clamp() =>
-      // X may exceed 1 when a wide text box is dragged beyond its traditional
-      // free-space boundary. The preview/PDF clip the box at the label edge.
-      LabelLayoutPosition(x: x.clamp(0.0, 20.0), y: y.clamp(0.0, 1.0));
+      // Rotated content can require a small negative normalized origin to put
+      // its visible bounding box flush with the top/left label edges. Values
+      // may also exceed 1 because text positions retain their legacy slot as
+      // the positioning reference while the rendered box wraps its content.
+      LabelLayoutPosition(
+        x: x.clamp(-20.0, 20.0),
+        y: y.clamp(-20.0, 20.0),
+        rotation: rotation.isFinite ? rotation : 0,
+      );
 
-  Map<String, double> toJson() => {'x': x, 'y': y};
+  Map<String, double> toJson() => {'x': x, 'y': y, 'rotation': rotation};
 
   static LabelLayoutPosition? fromJson(Object? value) {
     if (value is! Map<String, dynamic>) return null;
     final x = value['x'];
     final y = value['y'];
+    final rotation = value['rotation'];
     if (x is! num || y is! num) return null;
-    return LabelLayoutPosition(x: x.toDouble(), y: y.toDouble()).clamp();
+    return LabelLayoutPosition(
+      x: x.toDouble(),
+      y: y.toDouble(),
+      rotation: rotation is num ? rotation.toDouble() : 0,
+    ).clamp();
   }
 }
 

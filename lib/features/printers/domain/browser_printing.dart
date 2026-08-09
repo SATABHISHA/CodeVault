@@ -11,6 +11,10 @@ import '../../labels/domain/dynamic_label_field.dart';
 import '../../labels/domain/label_layout.dart';
 import '../../labels/domain/label_typography.dart';
 
+/// Flutter's preview canvas has a downward-positive Y axis, while PDF uses an
+/// upward-positive Y axis. Negating the angle preserves the visual direction.
+double pdfRotationFromPreview(double previewRotation) => -previewRotation;
+
 class BrowserLabelDocument {
   const BrowserLabelDocument({
     required this.title,
@@ -121,13 +125,13 @@ class BrowserPdfGenerator {
     bool visible(LabelFieldKey key) => settings[key]!.visible;
     double scaledFont(
       LabelFieldKey key, {
-      double min = 2.0,
+      double min = 0.8,
       double max = 14.0,
     }) => (settings[key]!.fontSize * fontScale).clamp(min, max);
 
-    final fCompany = scaledFont(LabelFieldKey.companyName, min: 2.5);
+    final fCompany = scaledFont(LabelFieldKey.companyName, min: 1.0);
     final fAddress = scaledFont(LabelFieldKey.companyAddress);
-    final fPart = scaledFont(LabelFieldKey.partNumber, min: 2.5);
+    final fPart = scaledFont(LabelFieldKey.partNumber, min: 1.0);
     final fItem = scaledFont(LabelFieldKey.itemName);
     final fModel = scaledFont(LabelFieldKey.model);
     final fPort = scaledFont(LabelFieldKey.port);
@@ -190,16 +194,45 @@ class BrowserPdfGenerator {
       required double height,
       required pw.Widget child,
     }) {
+      final rotation = resolvedLayout.positionFor(element).rotation;
+      final isBarcode = {
+        LabelLayoutElement.singleBarcode,
+        LabelLayoutElement.dualLeftCode,
+        LabelLayoutElement.dualRightCode,
+      }.contains(element);
+      final textAlignment =
+          {
+            LabelLayoutElement.singleCompanyName,
+            LabelLayoutElement.dualCompanyName,
+          }.contains(element)
+          ? pw.Alignment.center
+          : pw.Alignment.centerLeft;
+      pw.Widget sizedChild(double resolvedWidth, double resolvedHeight) {
+        final content = pw.SizedBox(
+          width: resolvedWidth,
+          height: resolvedHeight,
+          child: isBarcode
+              ? child
+              : pw.FittedBox(
+                  fit: pw.BoxFit.scaleDown,
+                  alignment: textAlignment,
+                  child: child,
+                ),
+        );
+        return rotation == 0
+            ? content
+            : pw.Transform.rotate(
+                angle: pdfRotationFromPreview(rotation),
+                child: content,
+              );
+      }
+
       final rect = label.resolvedLayoutRects[element];
       if (rect != null) {
         return pw.Positioned(
           left: innerW * rect.left,
           top: innerH * rect.top,
-          child: pw.SizedBox(
-            width: innerW * rect.width,
-            height: innerH * rect.height,
-            child: child,
-          ),
+          child: sizedChild(innerW * rect.width, innerH * rect.height),
         );
       }
       final normalized = resolvedLayout.positionFor(element);
@@ -208,7 +241,7 @@ class BrowserPdfGenerator {
       return pw.Positioned(
         left: freeW * normalized.x,
         top: freeH * normalized.y,
-        child: pw.SizedBox(width: width, height: height, child: child),
+        child: sizedChild(width, height),
       );
     }
 
@@ -223,23 +256,35 @@ class BrowserPdfGenerator {
       return pw.Positioned(
         left: rect == null ? (innerW - width) * field.x : innerW * rect.left,
         top: rect == null ? (innerH - height) * field.y : innerH * rect.top,
-        child: pw.SizedBox(
-          width: width,
-          height: height,
-          child: pw.Text(
-            '${field.label}: ${field.value}',
-            maxLines: 1,
-            overflow: pw.TextOverflow.clip,
-            style: pw.TextStyle(
-              font: labelFont,
-              fontWeight: pw.FontWeight.bold,
-              fontSize: (field.fontSize * fontScale).clamp(2.0, 14.0),
-              letterSpacing: LabelTypography.textTracking,
+        child: pw.Transform.rotate(
+          angle: pdfRotationFromPreview(field.rotation),
+          child: pw.SizedBox(
+            width: width,
+            height: height,
+            child: pw.FittedBox(
+              fit: pw.BoxFit.scaleDown,
+              alignment: pw.Alignment.centerLeft,
+              child: pw.Text(
+                '${field.label}: ${field.value}',
+                maxLines: 1,
+                style: pw.TextStyle(
+                  font: labelFont,
+                  fontWeight: pw.FontWeight.bold,
+                  fontSize: (field.fontSize * fontScale).clamp(0.8, 14.0),
+                  letterSpacing: LabelTypography.textTracking,
+                ),
+              ),
             ),
           ),
         ),
       );
     }
+
+    pw.Widget dateTimeText(pw.TextStyle style) => pw.Text(
+      'DATE: ${label.dateText.isEmpty ? '-' : label.dateText}    TIME: ${label.timeText.isEmpty ? '-' : label.timeText}',
+      maxLines: 1,
+      style: style,
+    );
 
     // ── Single sticker widget ────────────────────────────────────────────────
     // Uses FIXED width × height and clips content. Never grows beyond bounds.
@@ -320,11 +365,8 @@ class BrowserPdfGenerator {
                   element: LabelLayoutElement.dualDateTime,
                   width: centerW,
                   height: dualLineH,
-                  child: pw.Text(
-                    'DATE: ${label.dateText.isEmpty ? '-' : label.dateText}    TIME: ${label.timeText.isEmpty ? '-' : label.timeText}',
-                    maxLines: 1,
-                    overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
+                  child: dateTimeText(
+                    pw.TextStyle(
                       font: labelFont,
                       fontWeight: pw.FontWeight.bold,
                       fontSize: fDateTime,
@@ -397,7 +439,9 @@ class BrowserPdfGenerator {
                   width: singleTextW,
                   height: singleLineH,
                   child: pw.Text(
-                    label.company,
+                    label.company.isEmpty
+                        ? 'COMPANY NAME'
+                        : label.company.toUpperCase(),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
                     style: pw.TextStyle(
@@ -474,11 +518,8 @@ class BrowserPdfGenerator {
                   element: LabelLayoutElement.singleDateTime,
                   width: singleTextW,
                   height: singleLineH,
-                  child: pw.Text(
-                    'DATE: ${label.dateText.isEmpty ? '-' : label.dateText}    TIME: ${label.timeText.isEmpty ? '-' : label.timeText}',
-                    maxLines: 1,
-                    overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(font: labelFont, fontSize: fDateTime),
+                  child: dateTimeText(
+                    pw.TextStyle(font: labelFont, fontSize: fDateTime),
                   ),
                 ),
               if (visible(LabelFieldKey.barcode))
