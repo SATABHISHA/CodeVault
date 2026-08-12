@@ -6,6 +6,9 @@ enum LabelLayoutElement {
   singlePartNumber,
   singleItemName,
   singleModelPort,
+  singleDate,
+  singleTime,
+  // Legacy saved-layout key. New rendering uses singleDate/singleTime.
   singleDateTime,
   singleBarcode,
   singleCodeData,
@@ -13,6 +16,9 @@ enum LabelLayoutElement {
   dualCompanyName,
   dualModel,
   dualPort,
+  dualDate,
+  dualTime,
+  // Legacy saved-layout key. New rendering uses dualDate/dualTime.
   dualDateTime,
   dualPartNumber,
   dualItemName,
@@ -77,6 +83,9 @@ class LabelLayoutPosition {
 class LabelLayout {
   const LabelLayout(this.positions);
 
+  static const double _singleTimeOffsetX = 0.24;
+  static const double _dualTimeOffsetX = 0.19;
+
   final Map<LabelLayoutElement, LabelLayoutPosition> positions;
 
   factory LabelLayout.defaults() => LabelLayout({
@@ -106,10 +115,8 @@ class LabelLayout {
       x: 2.45,
       y: 0.38,
     ),
-    LabelLayoutElement.singleDateTime: const LabelLayoutPosition(
-      x: 0.02,
-      y: 0.46,
-    ),
+    LabelLayoutElement.singleDate: const LabelLayoutPosition(x: 0.02, y: 0.46),
+    LabelLayoutElement.singleTime: const LabelLayoutPosition(x: 0.26, y: 0.46),
     LabelLayoutElement.singleBarcode: const LabelLayoutPosition(
       x: 0.02,
       y: 0.54,
@@ -128,10 +135,8 @@ class LabelLayout {
     ),
     LabelLayoutElement.dualModel: const LabelLayoutPosition(x: 0.24, y: 0.18),
     LabelLayoutElement.dualPort: const LabelLayoutPosition(x: 0.67, y: 0.18),
-    LabelLayoutElement.dualDateTime: const LabelLayoutPosition(
-      x: 0.24,
-      y: 0.30,
-    ),
+    LabelLayoutElement.dualDate: const LabelLayoutPosition(x: 0.24, y: 0.30),
+    LabelLayoutElement.dualTime: const LabelLayoutPosition(x: 0.43, y: 0.30),
     LabelLayoutElement.dualPartNumber: const LabelLayoutPosition(
       x: 0.24,
       y: 0.42,
@@ -154,8 +159,39 @@ class LabelLayout {
     ),
   });
 
-  LabelLayoutPosition positionFor(LabelLayoutElement element) =>
-      positions[element] ?? LabelLayout.defaults().positions[element]!;
+  LabelLayoutPosition positionFor(LabelLayoutElement element) {
+    final directPosition = positions[element];
+    if (directPosition != null) return directPosition;
+
+    // Keep callers using the previous combined elements safe while the saved
+    // representation migrates to independently positioned Date and Time.
+    final legacyPosition = switch (element) {
+      LabelLayoutElement.singleDate =>
+        positions[LabelLayoutElement.singleDateTime],
+      LabelLayoutElement.singleTime => _followingTimePosition(
+        positions[LabelLayoutElement.singleDateTime],
+        _singleTimeOffsetX,
+      ),
+      LabelLayoutElement.singleDateTime =>
+        positions[LabelLayoutElement.singleDate],
+      LabelLayoutElement.dualDate => positions[LabelLayoutElement.dualDateTime],
+      LabelLayoutElement.dualTime => _followingTimePosition(
+        positions[LabelLayoutElement.dualDateTime],
+        _dualTimeOffsetX,
+      ),
+      LabelLayoutElement.dualDateTime => positions[LabelLayoutElement.dualDate],
+      _ => null,
+    };
+    if (legacyPosition != null) return legacyPosition;
+
+    final defaults = LabelLayout.defaults().positions;
+    return switch (element) {
+      LabelLayoutElement.singleDateTime =>
+        defaults[LabelLayoutElement.singleDate]!,
+      LabelLayoutElement.dualDateTime => defaults[LabelLayoutElement.dualDate]!,
+      _ => defaults[element]!,
+    };
+  }
 
   LabelLayout copyWithElement(
     LabelLayoutElement element,
@@ -167,7 +203,34 @@ class LabelLayout {
   String toEncodedJson() {
     final data = <String, Map<String, double>>{};
     for (final entry in positions.entries) {
+      if (_isLegacyDateTimeElement(entry.key)) continue;
       data[entry.key.name] = entry.value.clamp().toJson();
+    }
+
+    // A layout assembled with the old public elements is upgraded as soon as
+    // it is saved. Do not keep writing the legacy combined keys indefinitely.
+    final legacySingle = positions[LabelLayoutElement.singleDateTime];
+    if (legacySingle != null) {
+      data.putIfAbsent(
+        LabelLayoutElement.singleDate.name,
+        () => legacySingle.clamp().toJson(),
+      );
+      data.putIfAbsent(
+        LabelLayoutElement.singleTime.name,
+        () =>
+            _followingTimePosition(legacySingle, _singleTimeOffsetX)!.toJson(),
+      );
+    }
+    final legacyDual = positions[LabelLayoutElement.dualDateTime];
+    if (legacyDual != null) {
+      data.putIfAbsent(
+        LabelLayoutElement.dualDate.name,
+        () => legacyDual.clamp().toJson(),
+      );
+      data.putIfAbsent(
+        LabelLayoutElement.dualTime.name,
+        () => _followingTimePosition(legacyDual, _dualTimeOffsetX)!.toJson(),
+      );
     }
     return jsonEncode(data);
   }
@@ -178,14 +241,68 @@ class LabelLayout {
     final decoded = jsonDecode(encoded);
     if (decoded is! Map<String, dynamic>) return LabelLayout.defaults();
     final resolved = <LabelLayoutElement, LabelLayoutPosition>{...defaults};
+    final explicitlyRestored = <LabelLayoutElement>{};
+    LabelLayoutPosition? legacySingleDateTime;
+    LabelLayoutPosition? legacyDualDateTime;
     for (final entry in decoded.entries) {
       final element = LabelLayoutElement.values
           .where((candidate) => candidate.name == entry.key)
           .firstOrNull;
       if (element == null) continue;
       final position = LabelLayoutPosition.fromJson(entry.value);
-      if (position != null) resolved[element] = position;
+      if (position == null) continue;
+      switch (element) {
+        case LabelLayoutElement.singleDateTime:
+          legacySingleDateTime = position;
+          break;
+        case LabelLayoutElement.dualDateTime:
+          legacyDualDateTime = position;
+          break;
+        default:
+          resolved[element] = position;
+          explicitlyRestored.add(element);
+          break;
+      }
+    }
+
+    if (legacySingleDateTime != null) {
+      if (!explicitlyRestored.contains(LabelLayoutElement.singleDate)) {
+        resolved[LabelLayoutElement.singleDate] = legacySingleDateTime;
+      }
+      if (!explicitlyRestored.contains(LabelLayoutElement.singleTime)) {
+        resolved[LabelLayoutElement.singleTime] = _followingTimePosition(
+          legacySingleDateTime,
+          _singleTimeOffsetX,
+        )!;
+      }
+    }
+    if (legacyDualDateTime != null) {
+      if (!explicitlyRestored.contains(LabelLayoutElement.dualDate)) {
+        resolved[LabelLayoutElement.dualDate] = legacyDualDateTime;
+      }
+      if (!explicitlyRestored.contains(LabelLayoutElement.dualTime)) {
+        resolved[LabelLayoutElement.dualTime] = _followingTimePosition(
+          legacyDualDateTime,
+          _dualTimeOffsetX,
+        )!;
+      }
     }
     return LabelLayout(resolved);
+  }
+
+  static bool _isLegacyDateTimeElement(LabelLayoutElement element) =>
+      element == LabelLayoutElement.singleDateTime ||
+      element == LabelLayoutElement.dualDateTime;
+
+  static LabelLayoutPosition? _followingTimePosition(
+    LabelLayoutPosition? datePosition,
+    double horizontalOffset,
+  ) {
+    if (datePosition == null) return null;
+    return LabelLayoutPosition(
+      x: datePosition.x + horizontalOffset,
+      y: datePosition.y,
+      rotation: datePosition.rotation,
+    ).clamp();
   }
 }

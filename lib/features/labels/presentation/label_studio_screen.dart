@@ -382,36 +382,17 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   }
 
   Future<void> _saveLabelLayout({bool notify = false}) async {
-    final identity = _localProfileIdentity;
-    if (identity == null) {
-      if (notify) {
-        _notice('Please sign in before saving preview layout');
-      }
-      return;
-    }
-    try {
-      await labelLayoutStore.save(
-        tenantId: identity.$1,
-        userId: identity.$2,
-        layout: _labelLayout,
-      );
-      if (notify && mounted) {
-        _notice('Label preview layout saved');
-      }
-    } catch (error) {
-      if (notify && mounted) {
-        _notice('Layout could not be saved: $error');
-      }
-    }
+    // Moving or rotating only updates the in-memory draft. The explicit save
+    // action persists the complete Part Master record and its layout together.
+    if (notify) await _savePartMasterWithLayout();
   }
 
   Future<void> _resetLabelLayout({bool notify = false}) async {
     if (mounted) {
       setState(() => _labelLayout = LabelLayout.defaults());
     }
-    await _saveLabelLayout();
     if (notify && mounted) {
-      _notice('Label layout reset to default');
+      _notice('Layout reset. Save the Part Master to keep this layout.');
     }
   }
 
@@ -991,24 +972,18 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     final profile = sizes[labelSize]!;
     final portValue = portLabel.text.trim().toUpperCase();
     final showCompanyName = _isVisible(LabelFieldKey.companyName);
-    final showCompanyAddress = _isVisible(LabelFieldKey.companyAddress);
+    final showCompanyAddress =
+        _isVisible(LabelFieldKey.companyAddress) &&
+        companyAddress.text.trim().isNotEmpty;
     final showPartNumber = _isVisible(LabelFieldKey.partNumber);
     final showSerialNumber = _isVisible(LabelFieldKey.serialNumber);
     final showItemName = _isVisible(LabelFieldKey.itemName) && includeName;
     final showModel = _isVisible(LabelFieldKey.model);
     final showPort = _isVisible(LabelFieldKey.port) && portValue.isNotEmpty;
-    final showDateTime = _isVisible(LabelFieldKey.dateTime);
+    final showDate = _isVisible(LabelFieldKey.date);
+    final showTime = _isVisible(LabelFieldKey.time);
     final showCodeData = _isVisible(LabelFieldKey.codeData);
     final showBarcode = _isVisible(LabelFieldKey.barcode);
-    final companyFont = _fontSize(LabelFieldKey.companyName);
-    final addressFont = _fontSize(LabelFieldKey.companyAddress);
-    final partFont = _fontSize(LabelFieldKey.partNumber);
-    final serialFont = _fontSize(LabelFieldKey.serialNumber);
-    final itemFont = _fontSize(LabelFieldKey.itemName);
-    final modelFont = _fontSize(LabelFieldKey.model);
-    final portFont = _fontSize(LabelFieldKey.port);
-    final dateTimeFont = _fontSize(LabelFieldKey.dateTime);
-    final codeDataFont = _fontSize(LabelFieldKey.codeData);
     return _panel(
       context,
       title: 'Live label preview',
@@ -1121,15 +1096,15 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: dualCenterWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    text: companyName.text.trim().isEmpty
-                                        ? 'COMPANY NAME'
-                                        : companyName.text.trim().toUpperCase(),
+                                    text: _fieldText(
+                                      LabelFieldKey.companyName,
+                                      'COMPANY',
+                                      companyName.text.toUpperCase(),
+                                      emptyValue: '—',
+                                    ),
                                     textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: LabelTypography.fontFamily,
-                                      fontWeight: FontWeight.w900,
-                                      fontSize: companyFont,
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.companyName,
                                       letterSpacing:
                                           LabelTypography.companyTracking,
                                       height: 1.05,
@@ -1142,13 +1117,13 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: dualModelWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    text:
-                                        'MODEL: ${model.text.trim().isEmpty ? '-' : model.text.trim().toUpperCase()}',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: LabelTypography.fontFamily,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: modelFont,
+                                    text: _fieldText(
+                                      LabelFieldKey.model,
+                                      'MODEL',
+                                      model.text.toUpperCase(),
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.model,
                                       letterSpacing:
                                           LabelTypography.textTracking,
                                       height: 1.15,
@@ -1161,31 +1136,51 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: dualPortWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    text: portLabel.text.trim().toUpperCase(),
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: LabelTypography.fontFamily,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: portFont,
+                                    text: _fieldText(
+                                      LabelFieldKey.port,
+                                      'PORT',
+                                      portLabel.text.toUpperCase(),
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.port,
                                       letterSpacing:
                                           LabelTypography.textTracking,
                                       height: 1.15,
                                     ),
                                   ),
-                                if (showDateTime)
+                                if (showDate)
                                   _draggablePreviewTextFeature(
                                     area: area,
-                                    element: LabelLayoutElement.dualDateTime,
+                                    element: LabelLayoutElement.dualDate,
                                     maxWidth: dualCenterWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    text:
-                                        'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}    TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: LabelTypography.fontFamily,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: dateTimeFont,
+                                    text: _fieldText(
+                                      LabelFieldKey.date,
+                                      'DATE',
+                                      labelDate.text,
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.date,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.15,
+                                    ),
+                                  ),
+                                if (showTime)
+                                  _draggablePreviewTextFeature(
+                                    area: area,
+                                    element: LabelLayoutElement.dualTime,
+                                    maxWidth: dualCenterWidth,
+                                    onChanged: _setLayoutPosition,
+                                    onEnd: _saveLabelLayout,
+                                    text: _fieldText(
+                                      LabelFieldKey.time,
+                                      'TIME',
+                                      labelTime.text,
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.time,
                                       letterSpacing:
                                           LabelTypography.textTracking,
                                       height: 1.15,
@@ -1198,23 +1193,17 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: dualCenterWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: dualCenterWidth,
-                                      child: Text(
-                                        'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily:
-                                              LabelTypography.fontFamily,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: partFont,
-                                          letterSpacing:
-                                              LabelTypography.textTracking,
-                                          height: 1.1,
-                                        ),
-                                      ),
+                                    text: _fieldText(
+                                      LabelFieldKey.partNumber,
+                                      'PART NO',
+                                      partNumber.text,
+                                      emptyValue: '—',
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.partNumber,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.1,
                                     ),
                                   ),
                                 if (showItemName)
@@ -1224,25 +1213,17 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: dualCenterWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: dualCenterWidth,
-                                      child: Text(
-                                        itemName.text.isEmpty
-                                            ? '—'
-                                            : itemName.text,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily:
-                                              LabelTypography.fontFamily,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: itemFont,
-                                          letterSpacing:
-                                              LabelTypography.textTracking,
-                                          height: 1.15,
-                                        ),
-                                      ),
+                                    text: _fieldText(
+                                      LabelFieldKey.itemName,
+                                      'ITEM',
+                                      itemName.text,
+                                      emptyValue: '—',
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.itemName,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.15,
                                     ),
                                   ),
                                 if (showSerialNumber)
@@ -1253,13 +1234,13 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: dualCenterWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    text:
-                                        'SERIAL NO: ${serial.text.trim().isEmpty ? '-' : serial.text.trim()}',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontFamily: LabelTypography.fontFamily,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: serialFont,
+                                    text: _fieldText(
+                                      LabelFieldKey.serialNumber,
+                                      'SERIAL NO',
+                                      serial.text,
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.serialNumber,
                                       letterSpacing:
                                           LabelTypography.textTracking,
                                       height: 1.15,
@@ -1272,23 +1253,16 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: dualCenterWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: dualCenterWidth,
-                                      child: Text(
-                                        scanData,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily:
-                                              LabelTypography.fontFamily,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: codeDataFont,
-                                          letterSpacing:
-                                              LabelTypography.textTracking,
-                                          height: 1.15,
-                                        ),
-                                      ),
+                                    text: _fieldText(
+                                      LabelFieldKey.codeData,
+                                      'CODE',
+                                      scanData,
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.codeData,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.15,
                                     ),
                                   ),
                                 if (showBarcode)
@@ -1316,22 +1290,17 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: singleTextWidth,
-                                      child: Text(
-                                        companyName.text.trim().isEmpty
-                                            ? 'COMPANY NAME'
-                                            : companyName.text
-                                                  .trim()
-                                                  .toUpperCase(),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontWeight: FontWeight.w900,
-                                          fontSize: companyFont,
-                                        ),
-                                      ),
+                                    text: _fieldText(
+                                      LabelFieldKey.companyName,
+                                      'COMPANY',
+                                      companyName.text.toUpperCase(),
+                                      emptyValue: '—',
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.companyName,
+                                      letterSpacing:
+                                          LabelTypography.companyTracking,
+                                      height: 1.05,
                                     ),
                                   ),
                                 if (showCompanyAddress)
@@ -1342,21 +1311,18 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: singleTextWidth,
-                                      child: Text(
-                                        companyAddress.text.trim().isEmpty
-                                            ? 'COMPANY ADDRESS'
-                                            : companyAddress.text
-                                                  .trim()
-                                                  .toUpperCase(),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black54,
-                                          fontSize: addressFont,
-                                        ),
-                                      ),
+                                    text: _fieldText(
+                                      LabelFieldKey.companyAddress,
+                                      'ADDRESS',
+                                      companyAddress.text.toUpperCase(),
+                                      emptyValue: '—',
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.companyAddress,
+                                      color: Colors.black54,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.1,
                                     ),
                                   ),
                                 if (showPartNumber)
@@ -1367,18 +1333,17 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: singleTextWidth,
-                                      child: Text(
-                                        'PART NO: ${partNumber.text.isEmpty ? '—' : partNumber.text}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: partFont,
-                                        ),
-                                      ),
+                                    text: _fieldText(
+                                      LabelFieldKey.partNumber,
+                                      'PART NO',
+                                      partNumber.text,
+                                      emptyValue: '—',
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.partNumber,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.1,
                                     ),
                                   ),
                                 if (showItemName)
@@ -1388,17 +1353,17 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: singleTextWidth,
-                                      child: Text(
-                                        'ITEM: ${itemName.text.isEmpty ? '—' : itemName.text}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontSize: itemFont,
-                                        ),
-                                      ),
+                                    text: _fieldText(
+                                      LabelFieldKey.itemName,
+                                      'ITEM',
+                                      itemName.text,
+                                      emptyValue: '—',
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.itemName,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.1,
                                     ),
                                   ),
                                 if (showModel || showPort)
@@ -1408,24 +1373,28 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: singleTextWidth,
-                                      child: Text(
-                                        showModel
-                                            ? (showPort
-                                                  ? 'MODEL: ${model.text.isEmpty ? '—' : model.text}   ${portLabel.text.trim()}'
-                                                  : 'MODEL: ${model.text.isEmpty ? '—' : model.text}')
-                                            : portLabel.text.trim(),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontSize: math.max(
-                                            modelFont,
-                                            portFont,
-                                          ),
+                                    text: [
+                                      if (showModel)
+                                        _fieldText(
+                                          LabelFieldKey.model,
+                                          'MODEL',
+                                          model.text,
+                                          emptyValue: '—',
                                         ),
-                                      ),
+                                      if (showPort)
+                                        _fieldText(
+                                          LabelFieldKey.port,
+                                          'PORT',
+                                          portLabel.text,
+                                        ),
+                                    ].join('   '),
+                                    style: _previewTextStyle(
+                                      showModel
+                                          ? LabelFieldKey.model
+                                          : LabelFieldKey.port,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.1,
                                     ),
                                   ),
                                 if (showSerialNumber)
@@ -1436,32 +1405,54 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    text:
-                                        'SERIAL NO: ${serial.text.trim().isEmpty ? '-' : serial.text.trim()}',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: serialFont,
+                                    text: _fieldText(
+                                      LabelFieldKey.serialNumber,
+                                      'SERIAL NO',
+                                      serial.text,
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.serialNumber,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.1,
                                     ),
                                   ),
-                                if (showDateTime)
+                                if (showDate)
                                   _draggablePreviewTextFeature(
                                     area: area,
-                                    element: LabelLayoutElement.singleDateTime,
+                                    element: LabelLayoutElement.singleDate,
                                     maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: singleTextWidth,
-                                      child: Text(
-                                        'DATE: ${labelDate.text.isEmpty ? '-' : labelDate.text}   TIME: ${labelTime.text.isEmpty ? '-' : labelTime.text}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontSize: dateTimeFont,
-                                        ),
-                                      ),
+                                    text: _fieldText(
+                                      LabelFieldKey.date,
+                                      'DATE',
+                                      labelDate.text,
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.date,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.1,
+                                    ),
+                                  ),
+                                if (showTime)
+                                  _draggablePreviewTextFeature(
+                                    area: area,
+                                    element: LabelLayoutElement.singleTime,
+                                    maxWidth: singleTextWidth,
+                                    onChanged: _setLayoutPosition,
+                                    onEnd: _saveLabelLayout,
+                                    text: _fieldText(
+                                      LabelFieldKey.time,
+                                      'TIME',
+                                      labelTime.text,
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.time,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.1,
                                     ),
                                   ),
                                 if (showBarcode)
@@ -1487,18 +1478,15 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    child: SizedBox(
-                                      width: singleTextWidth,
-                                      child: Text(
-                                        scanData,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontFamily: 'monospace',
-                                          fontSize: codeDataFont,
-                                        ),
-                                      ),
+                                    text: _fieldText(
+                                      LabelFieldKey.codeData,
+                                      'CODE',
+                                      scanData,
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.codeData,
+                                      fontFamily: 'monospace',
+                                      height: 1.1,
                                     ),
                                   ),
                               ],
@@ -1518,11 +1506,18 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                           ? dualLineHeight
                                           : singleLineHeight,
                                     ),
-                                    text: '${field.label}: ${field.value}',
+                                    text: field.showCaption
+                                        ? '${field.label}: ${field.value}'
+                                        : field.value,
                                     style: TextStyle(
                                       color: Colors.black,
                                       fontFamily: LabelTypography.fontFamily,
-                                      fontWeight: FontWeight.bold,
+                                      fontStyle: _previewFontStyle(
+                                        field.fontStyle,
+                                      ),
+                                      fontWeight: _previewFontWeight(
+                                        field.fontWeight,
+                                      ),
                                       fontSize: field.fontSize,
                                       height: 1.1,
                                     ),
@@ -1586,9 +1581,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
             alignment: WrapAlignment.end,
             children: [
               OutlinedButton.icon(
-                onPressed: busy ? null : () => _saveLabelLayout(notify: true),
+                onPressed: busy ? null : _savePartMasterWithLayout,
                 icon: const Icon(Icons.save_outlined),
-                label: const Text('Save layout'),
+                label: const Text('Save Part Master & Layout'),
               ),
               OutlinedButton.icon(
                 onPressed: busy ? null : () => _resetLabelLayout(notify: true),
@@ -2161,8 +2156,66 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   bool _isVisible(LabelFieldKey keyName) =>
       LabelFieldConfig.isVisible(keyName, _labelFieldSettings);
 
+  LabelFieldSetting _fieldSetting(LabelFieldKey keyName) =>
+      _labelFieldSettings[keyName] ?? LabelFieldConfig.defaults()[keyName]!;
+
   double _fontSize(LabelFieldKey keyName) =>
       LabelFieldConfig.fontSizeFor(keyName, _labelFieldSettings);
+
+  String _fieldText(
+    LabelFieldKey keyName,
+    String caption,
+    String value, {
+    String emptyValue = '-',
+  }) {
+    final resolved = value.trim().isEmpty ? emptyValue : value.trim();
+    return _fieldSetting(keyName).showCaption
+        ? '$caption: $resolved'
+        : resolved;
+  }
+
+  FontStyle _previewFontStyle(LabelFontStyle style) =>
+      style == LabelFontStyle.italic ? FontStyle.italic : FontStyle.normal;
+
+  FontWeight _previewFontWeight(LabelFontWeight weight) => switch (weight) {
+    LabelFontWeight.regular => FontWeight.w400,
+    LabelFontWeight.medium => FontWeight.w500,
+    LabelFontWeight.semiBold => FontWeight.w600,
+    LabelFontWeight.bold => FontWeight.w700,
+    LabelFontWeight.black => FontWeight.w900,
+  };
+
+  String _fontStyleLabel(LabelFontStyle style) => switch (style) {
+    LabelFontStyle.normal => 'Normal',
+    LabelFontStyle.italic => 'Italic',
+  };
+
+  String _fontWeightLabel(LabelFontWeight weight) => switch (weight) {
+    LabelFontWeight.regular => 'Regular',
+    LabelFontWeight.medium => 'Medium',
+    LabelFontWeight.semiBold => 'Semi bold',
+    LabelFontWeight.bold => 'Bold',
+    LabelFontWeight.black => 'Black',
+  };
+
+  TextStyle _previewTextStyle(
+    LabelFieldKey keyName, {
+    Color color = Colors.black,
+    String? fontFamily = LabelTypography.fontFamily,
+    double? letterSpacing,
+    double? height,
+  }) {
+    final setting = _fieldSetting(keyName);
+    return TextStyle(
+      color: color,
+      fontFamily: fontFamily,
+      fontSize: setting.fontSize,
+      fontStyle: _previewFontStyle(setting.fontStyle),
+      fontWeight: _previewFontWeight(setting.fontWeight),
+      letterSpacing: letterSpacing,
+      height: height,
+    );
+  }
 
   void _setVisibility(LabelFieldKey keyName, bool visible) {
     final current =
@@ -2185,6 +2238,36 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       _labelFieldSettings = {
         ..._labelFieldSettings,
         keyName: current.copyWith(fontSize: value),
+      };
+    });
+  }
+
+  void _setShowCaption(LabelFieldKey keyName, bool showCaption) {
+    final current = _fieldSetting(keyName);
+    setState(() {
+      _labelFieldSettings = {
+        ..._labelFieldSettings,
+        keyName: current.copyWith(showCaption: showCaption),
+      };
+    });
+  }
+
+  void _setFontStyleValue(LabelFieldKey keyName, LabelFontStyle value) {
+    final current = _fieldSetting(keyName);
+    setState(() {
+      _labelFieldSettings = {
+        ..._labelFieldSettings,
+        keyName: current.copyWith(fontStyle: value),
+      };
+    });
+  }
+
+  void _setFontWeightValue(LabelFieldKey keyName, LabelFontWeight value) {
+    final current = _fieldSetting(keyName);
+    setState(() {
+      _labelFieldSettings = {
+        ..._labelFieldSettings,
+        keyName: current.copyWith(fontWeight: value),
       };
     });
   }
@@ -2370,6 +2453,80 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                       ),
                     ],
                   ),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 220,
+                        child: SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          dense: true,
+                          visualDensity: VisualDensity.compact,
+                          title: const Text('Show field name'),
+                          subtitle: const Text('Off shows value only'),
+                          value: field.showCaption,
+                          onChanged: (showCaption) => _updateDynamicField(
+                            field.id,
+                            (current) =>
+                                current.copyWith(showCaption: showCaption),
+                          ),
+                        ),
+                      ),
+                      SizedBox(
+                        width: 150,
+                        child: DropdownButtonFormField<LabelFontStyle>(
+                          initialValue: field.fontStyle,
+                          decoration: const InputDecoration(
+                            labelText: 'Style',
+                            isDense: true,
+                          ),
+                          items: [
+                            for (final style in LabelFontStyle.values)
+                              DropdownMenuItem(
+                                value: style,
+                                child: Text(_fontStyleLabel(style)),
+                              ),
+                          ],
+                          onChanged: (style) {
+                            if (style != null) {
+                              _updateDynamicField(
+                                field.id,
+                                (current) => current.copyWith(fontStyle: style),
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                      SizedBox(
+                        width: 165,
+                        child: DropdownButtonFormField<LabelFontWeight>(
+                          initialValue: field.fontWeight,
+                          decoration: const InputDecoration(
+                            labelText: 'Weight',
+                            isDense: true,
+                          ),
+                          items: [
+                            for (final weight in LabelFontWeight.values)
+                              DropdownMenuItem(
+                                value: weight,
+                                child: Text(_fontWeightLabel(weight)),
+                              ),
+                          ],
+                          onChanged: (weight) {
+                            if (weight != null) {
+                              _updateDynamicField(
+                                field.id,
+                                (current) =>
+                                    current.copyWith(fontWeight: weight),
+                              );
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -2432,9 +2589,15 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
             supportsFont: true,
           ),
           (
-            keyName: LabelFieldKey.dateTime,
-            label: 'Date & time',
-            icon: Icons.schedule,
+            keyName: LabelFieldKey.date,
+            label: 'Date',
+            icon: Icons.calendar_today_outlined,
+            supportsFont: true,
+          ),
+          (
+            keyName: LabelFieldKey.time,
+            label: 'Time',
+            icon: Icons.schedule_outlined,
             supportsFont: true,
           ),
           (
@@ -2620,6 +2783,15 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
               opacity: visible ? 1 : .7,
               child: Column(
                 children: [
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    visualDensity: VisualDensity.compact,
+                    title: const Text('Show field name'),
+                    subtitle: const Text('Off shows only the field value'),
+                    value: setting.showCaption,
+                    onChanged: (value) => _setShowCaption(keyName, value),
+                  ),
                   Row(
                     children: [
                       Text(
@@ -2645,6 +2817,56 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                     label: setting.fontSize.toStringAsFixed(0),
                     onChanged: (value) => _setFontSizeValue(keyName, value),
                   ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<LabelFontStyle>(
+                          initialValue: setting.fontStyle,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Style',
+                            isDense: true,
+                          ),
+                          items: [
+                            for (final style in LabelFontStyle.values)
+                              DropdownMenuItem(
+                                value: style,
+                                child: Text(_fontStyleLabel(style)),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              _setFontStyleValue(keyName, value);
+                            }
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: DropdownButtonFormField<LabelFontWeight>(
+                          initialValue: setting.fontWeight,
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Weight',
+                            isDense: true,
+                          ),
+                          items: [
+                            for (final weight in LabelFontWeight.values)
+                              DropdownMenuItem(
+                                value: weight,
+                                child: Text(_fontWeightLabel(weight)),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              _setFontWeightValue(keyName, value);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                 ],
               ),
             ),
@@ -2673,6 +2895,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     'label_field_config': LabelFieldConfig.toJsonObject(_labelFieldSettings),
     'dynamic_label_fields': DynamicLabelField.listToJson(_dynamicFields),
     'scan_value_source': _scanValueSource,
+    'label_layout': labelLayoutToJson(_labelLayout),
     'is_active': true,
   };
 
@@ -2735,9 +2958,89 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     _scanValueSource = _isValidScanValueSource(part.scanValueSource)
         ? part.scanValueSource
         : 'encoded_text';
+    _labelLayout = part.labelLayout;
+    _selectedPreviewKey = null;
+    _activePreviewKey = null;
+    _previewElementRects.clear();
+    _previewDynamicRects.clear();
     includeName = _isVisible(LabelFieldKey.itemName);
     message = '${part.number} selected';
   });
+
+  Future<void> _savePartMasterWithLayout() async {
+    final number = partNumber.text.trim();
+    final name = itemName.text.trim();
+    if (number.isEmpty || name.isEmpty) {
+      _notice(
+        'Enter the part number and item name before saving the Part Master and layout.',
+      );
+      return;
+    }
+    final tenant = WindowsSession.companyId;
+    if (tenant == null) {
+      _notice('Please sign in before saving the Part Master and layout');
+      return;
+    }
+
+    PartRecord? target = selected;
+    target ??= parts
+        .where(
+          (part) => part.number.trim().toLowerCase() == number.toLowerCase(),
+        )
+        .firstOrNull;
+    if (target == null) {
+      try {
+        final allParts = await repository.list(tenant);
+        target = allParts
+            .where(
+              (part) =>
+                  part.number.trim().toLowerCase() == number.toLowerCase(),
+            )
+            .firstOrNull;
+      } catch (error) {
+        _notice(_error(error));
+        return;
+      }
+    }
+
+    if (target == null) {
+      if (!mounted) return;
+      final confirmed =
+          await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) => AlertDialog(
+              title: const Text('Add part and save layout?'),
+              content: Text(
+                'Part $number is not in Part Master. Save the entered part details, dynamic fields, field settings, and this label layout now?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton.icon(
+                  onPressed: () => Navigator.pop(dialogContext, true),
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('Add & save'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!confirmed) return;
+      await _mutate(
+        (tenantId) => repository.create(tenantId, _payload),
+        'Part Master and label layout saved',
+      );
+      return;
+    }
+
+    final partToUpdate = target;
+    await _mutate(
+      (tenantId) => repository.update(tenantId, partToUpdate, _payload),
+      'Part Master and label layout updated',
+    );
+  }
 
   Future<void> _saveNew() =>
       _mutate((tenant) => repository.create(tenant, _payload), 'Part inserted');
@@ -2766,10 +3069,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       final persisted = parts
           .where((part) => part.id == changed.id)
           .firstOrNull;
-      if (persisted == null) {
-        throw StateError('The updated part could not be reloaded.');
-      }
-      _select(persisted);
+      // An active search can intentionally filter the just-saved record out
+      // of [parts]. The mutation response still contains the authoritative
+      // saved field settings and per-part layout.
+      _select(persisted ?? changed);
       _notice(success);
     } catch (error) {
       _notice(_error(error));
@@ -3071,6 +3374,11 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     quantity.text = '1';
     _labelFieldSettings = LabelFieldConfig.defaults();
     _dynamicFields = const [];
+    _labelLayout = LabelLayout.defaults();
+    _selectedPreviewKey = null;
+    _activePreviewKey = null;
+    _previewElementRects.clear();
+    _previewDynamicRects.clear();
     _scanValueSource = 'encoded_text';
     includeName = _isVisible(LabelFieldKey.itemName);
     companyName.text = WindowsSession.companyName;

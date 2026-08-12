@@ -214,6 +214,34 @@ class WebLocalExportService {
                   updatedAt: DateTime.parse(raw['updated_at'] as String),
                 ),
               );
+        } else {
+          final existingPayload =
+              jsonDecode(existing.payloadJson) as Map<String, dynamic>;
+          final importedPayload = raw['payload'] as Map<String, dynamic>;
+          final existingLayout =
+              existingPayload['label_layout'] ??
+              existingPayload['label_layout_config'];
+          final existingHasLayout = existingLayout != null;
+          final importedLayout =
+              importedPayload['label_layout'] ??
+              importedPayload['label_layout_config'];
+          // Merge imports normally preserve the target record. Backfill only
+          // the newly introduced per-part layout when the target is a legacy
+          // cached part, so importing a backup does not overwrite newer part
+          // details or an already customized target layout.
+          if (!existingHasLayout && importedLayout != null) {
+            existingPayload['label_layout'] = importedLayout;
+            await (database.update(database.cachedParts)..where(
+                  (row) =>
+                      row.tenantId.equals(tenantId) &
+                      row.id.equals(existing.id),
+                ))
+                .write(
+                  CachedPartsCompanion(
+                    payloadJson: Value(jsonEncode(existingPayload)),
+                  ),
+                );
+          }
         }
       }
       for (final raw in previews.cast<Map<String, dynamic>>()) {

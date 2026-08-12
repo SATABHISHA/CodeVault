@@ -9,6 +9,9 @@ class DynamicLabelField {
     required this.value,
     this.visible = true,
     this.fontSize = 10,
+    this.showCaption = true,
+    this.fontStyle = LabelFontStyle.normal,
+    this.fontWeight = LabelFontWeight.bold,
     this.x = .24,
     this.y = .74,
     this.rotation = 0,
@@ -19,6 +22,9 @@ class DynamicLabelField {
   final String value;
   final bool visible;
   final double fontSize;
+  final bool showCaption;
+  final LabelFontStyle fontStyle;
+  final LabelFontWeight fontWeight;
   final double x;
   final double y;
   final double rotation;
@@ -28,6 +34,9 @@ class DynamicLabelField {
     String? value,
     bool? visible,
     double? fontSize,
+    bool? showCaption,
+    LabelFontStyle? fontStyle,
+    LabelFontWeight? fontWeight,
     double? x,
     double? y,
     double? rotation,
@@ -40,6 +49,9 @@ class DynamicLabelField {
       LabelFieldConfig.minFontSize,
       LabelFieldConfig.maxFontSize,
     ),
+    showCaption: showCaption ?? this.showCaption,
+    fontStyle: fontStyle ?? this.fontStyle,
+    fontWeight: fontWeight ?? this.fontWeight,
     x: (x ?? this.x).clamp(-20.0, 20.0),
     y: (y ?? this.y).clamp(-20.0, 20.0),
     rotation: (rotation ?? this.rotation).isFinite
@@ -53,6 +65,9 @@ class DynamicLabelField {
     'value': value,
     'visible': visible,
     'font_size': fontSize,
+    'show_caption': showCaption,
+    'font_style': fontStyle.name,
+    'font_weight': fontWeight.name,
     'x': x,
     'y': y,
     'rotation': rotation,
@@ -77,6 +92,19 @@ class DynamicLabelField {
       fontSize: (size is num ? size.toDouble() : 10.0)
           .clamp(LabelFieldConfig.minFontSize, LabelFieldConfig.maxFontSize)
           .toDouble(),
+      showCaption: json['show_caption'] is bool
+          ? json['show_caption'] as bool
+          : true,
+      fontStyle: _enumByName(
+        LabelFontStyle.values,
+        json['font_style'],
+        LabelFontStyle.normal,
+      ),
+      fontWeight: _enumByName(
+        LabelFontWeight.values,
+        json['font_weight'],
+        LabelFontWeight.bold,
+      ),
       x: (x is num ? x.toDouble() : .24).clamp(-20.0, 20.0).toDouble(),
       y: (y is num ? y.toDouble() : .74 + (index * .075))
           .clamp(-20.0, 20.0)
@@ -99,6 +127,18 @@ class DynamicLabelField {
         .map((entry) => fromJson(entry.$2, index: entry.$1))
         .whereType<DynamicLabelField>()
         .toList();
+  }
+
+  static T _enumByName<T extends Enum>(
+    List<T> values,
+    Object? name,
+    T fallback,
+  ) {
+    if (name is! String) return fallback;
+    for (final value in values) {
+      if (value.name == name) return value;
+    }
+    return fallback;
   }
 
   static List<Map<String, dynamic>> listToJson(

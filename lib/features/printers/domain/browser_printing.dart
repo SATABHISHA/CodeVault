@@ -186,11 +186,50 @@ class BrowserPdfGenerator {
         ? innerH / label.previewCanvasHeight!
         : (label.heightMm / 30.0).clamp(0.5, 2.0) * 0.6;
     final settings = LabelFieldConfig.mergeWithDefaults(label.fieldSettings);
+    LabelFieldSetting setting(LabelFieldKey key) => settings[key]!;
     bool visible(LabelFieldKey key) => settings[key]!.visible;
+    String fieldText(
+      LabelFieldKey key,
+      String caption,
+      String value, {
+      String emptyValue = '-',
+    }) {
+      final resolvedValue = value.trim().isEmpty ? emptyValue : value.trim();
+      return setting(key).showCaption
+          ? '$caption: $resolvedValue'
+          : resolvedValue;
+    }
+
+    pw.FontStyle pdfFontStyle(LabelFontStyle style) =>
+        style == LabelFontStyle.italic
+        ? pw.FontStyle.italic
+        : pw.FontStyle.normal;
+
+    pw.FontWeight pdfFontWeight(LabelFontWeight weight) => switch (weight) {
+      LabelFontWeight.regular || LabelFontWeight.medium => pw.FontWeight.normal,
+      LabelFontWeight.semiBold ||
+      LabelFontWeight.bold ||
+      LabelFontWeight.black => pw.FontWeight.bold,
+    };
+
+    pw.TextStyle fieldStyle(
+      LabelFieldKey key,
+      double fontSize, {
+      PdfColor? color,
+      double? letterSpacing,
+    }) => pw.TextStyle(
+      font: labelFont,
+      fontSize: fontSize,
+      fontStyle: pdfFontStyle(setting(key).fontStyle),
+      fontWeight: pdfFontWeight(setting(key).fontWeight),
+      color: color,
+      letterSpacing: letterSpacing,
+    );
+
     double scaledFont(
       LabelFieldKey key, {
       double min = 0.8,
-      double max = 14.0,
+      double max = LabelFieldConfig.maxFontSize,
     }) => (settings[key]!.fontSize * fontScale).clamp(min, max);
 
     final fCompany = scaledFont(LabelFieldKey.companyName, min: 1.0);
@@ -200,7 +239,8 @@ class BrowserPdfGenerator {
     final fItem = scaledFont(LabelFieldKey.itemName);
     final fModel = scaledFont(LabelFieldKey.model);
     final fPort = scaledFont(LabelFieldKey.port);
-    final fDateTime = scaledFont(LabelFieldKey.dateTime);
+    final fDate = scaledFont(LabelFieldKey.date);
+    final fTime = scaledFont(LabelFieldKey.time);
     final fContent = scaledFont(LabelFieldKey.codeData);
 
     // Use the same geometry intent as live preview.
@@ -217,9 +257,8 @@ class BrowserPdfGenerator {
     final showPort =
         visible(LabelFieldKey.port) && label.port.trim().isNotEmpty;
     final showSingleModelPort = showModel || showPort;
-    final showDateTime =
-        visible(LabelFieldKey.dateTime) &&
-        (label.dateText.isNotEmpty || label.timeText.isNotEmpty);
+    final showDate = visible(LabelFieldKey.date);
+    final showTime = visible(LabelFieldKey.time);
     // ── Barcode sizing ───────────────────────────────────────────────────────
     final barcodeH = math.min(innerH * 0.42, innerW * 0.45);
     final barcodeW = label.symbology == 'code128'
@@ -234,7 +273,8 @@ class BrowserPdfGenerator {
       fItem,
       fModel,
       fPort,
-      fDateTime,
+      fDate,
+      fTime,
       fContent,
     ].reduce(math.max);
     final dualFontPeak = [
@@ -244,7 +284,8 @@ class BrowserPdfGenerator {
       fItem,
       fModel,
       fPort,
-      fDateTime,
+      fDate,
+      fTime,
       fContent,
     ].reduce(math.max);
     // Match the preview's proportional line boxes. Fixed 9/10-point minimums
@@ -332,12 +373,18 @@ class BrowserPdfGenerator {
               fit: pw.BoxFit.scaleDown,
               alignment: pw.Alignment.centerLeft,
               child: pw.Text(
-                '${field.label}: ${field.value}',
+                field.showCaption
+                    ? '${field.label}: ${field.value}'
+                    : field.value,
                 maxLines: 1,
                 style: pw.TextStyle(
                   font: labelFont,
-                  fontWeight: pw.FontWeight.bold,
-                  fontSize: (field.fontSize * fontScale).clamp(0.8, 14.0),
+                  fontStyle: pdfFontStyle(field.fontStyle),
+                  fontWeight: pdfFontWeight(field.fontWeight),
+                  fontSize: (field.fontSize * fontScale).clamp(
+                    0.8,
+                    LabelFieldConfig.maxFontSize,
+                  ),
                   letterSpacing: LabelTypography.textTracking,
                 ),
               ),
@@ -346,12 +393,6 @@ class BrowserPdfGenerator {
         ),
       );
     }
-
-    pw.Widget dateTimeText(pw.TextStyle style) => pw.Text(
-      'DATE: ${label.dateText.isEmpty ? '-' : label.dateText}    TIME: ${label.timeText.isEmpty ? '-' : label.timeText}',
-      maxLines: 1,
-      style: style,
-    );
 
     // ── Single sticker widget ────────────────────────────────────────────────
     // Uses FIXED width × height and clips content. Never grows beyond bounds.
@@ -385,16 +426,17 @@ class BrowserPdfGenerator {
                   width: centerW,
                   height: dualLineH,
                   child: pw.Text(
-                    label.company.isEmpty
-                        ? 'COMPANY'
-                        : label.company.toUpperCase(),
+                    fieldText(
+                      LabelFieldKey.companyName,
+                      'COMPANY',
+                      label.company.toUpperCase(),
+                    ),
                     textAlign: pw.TextAlign.center,
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
-                      font: labelFont,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: fCompany,
+                    style: fieldStyle(
+                      LabelFieldKey.companyName,
+                      fCompany,
                       letterSpacing: LabelTypography.companyTracking,
                     ),
                   ),
@@ -405,13 +447,16 @@ class BrowserPdfGenerator {
                   width: dualModelW,
                   height: dualLineH,
                   child: pw.Text(
-                    'MODEL: ${label.model.trim().isEmpty ? '-' : label.model.trim().toUpperCase()}',
+                    fieldText(
+                      LabelFieldKey.model,
+                      'MODEL',
+                      label.model.toUpperCase(),
+                    ),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
-                      font: labelFont,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: fModel,
+                    style: fieldStyle(
+                      LabelFieldKey.model,
+                      fModel,
                       letterSpacing: LabelTypography.textTracking,
                     ),
                   ),
@@ -422,27 +467,48 @@ class BrowserPdfGenerator {
                   width: dualPortW,
                   height: dualLineH,
                   child: pw.Text(
-                    label.port.trim().toUpperCase(),
+                    fieldText(
+                      LabelFieldKey.port,
+                      'PORT',
+                      label.port.toUpperCase(),
+                    ),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
-                      font: labelFont,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: fPort,
+                    style: fieldStyle(
+                      LabelFieldKey.port,
+                      fPort,
                       letterSpacing: LabelTypography.textTracking,
                     ),
                   ),
                 ),
-              if (showDateTime)
+              if (showDate)
                 positionedElement(
-                  element: LabelLayoutElement.dualDateTime,
+                  element: LabelLayoutElement.dualDate,
                   width: centerW,
                   height: dualLineH,
-                  child: dateTimeText(
-                    pw.TextStyle(
-                      font: labelFont,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: fDateTime,
+                  child: pw.Text(
+                    fieldText(LabelFieldKey.date, 'DATE', label.dateText),
+                    maxLines: 1,
+                    overflow: pw.TextOverflow.clip,
+                    style: fieldStyle(
+                      LabelFieldKey.date,
+                      fDate,
+                      letterSpacing: LabelTypography.textTracking,
+                    ),
+                  ),
+                ),
+              if (showTime)
+                positionedElement(
+                  element: LabelLayoutElement.dualTime,
+                  width: centerW,
+                  height: dualLineH,
+                  child: pw.Text(
+                    fieldText(LabelFieldKey.time, 'TIME', label.timeText),
+                    maxLines: 1,
+                    overflow: pw.TextOverflow.clip,
+                    style: fieldStyle(
+                      LabelFieldKey.time,
+                      fTime,
                       letterSpacing: LabelTypography.textTracking,
                     ),
                   ),
@@ -453,13 +519,16 @@ class BrowserPdfGenerator {
                   width: centerW,
                   height: dualLineH,
                   child: pw.Text(
-                    'PART NO: ${values.partNumber.isEmpty ? '-' : values.partNumber}',
+                    fieldText(
+                      LabelFieldKey.partNumber,
+                      'PART NO',
+                      values.partNumber,
+                    ),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
-                      font: labelFont,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: fPart,
+                    style: fieldStyle(
+                      LabelFieldKey.partNumber,
+                      fPart,
                       letterSpacing: LabelTypography.textTracking,
                     ),
                   ),
@@ -470,13 +539,12 @@ class BrowserPdfGenerator {
                   width: centerW,
                   height: dualLineH,
                   child: pw.Text(
-                    label.itemName,
+                    fieldText(LabelFieldKey.itemName, 'ITEM', label.itemName),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
-                      font: labelFont,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: fItem,
+                    style: fieldStyle(
+                      LabelFieldKey.itemName,
+                      fItem,
                       letterSpacing: LabelTypography.textTracking,
                     ),
                   ),
@@ -487,13 +555,16 @@ class BrowserPdfGenerator {
                   width: centerW,
                   height: dualLineH,
                   child: pw.Text(
-                    'SERIAL NO: ${values.serialNumber.isEmpty ? '-' : values.serialNumber}',
+                    fieldText(
+                      LabelFieldKey.serialNumber,
+                      'SERIAL NO',
+                      values.serialNumber,
+                    ),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
-                      font: labelFont,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: fSerial,
+                    style: fieldStyle(
+                      LabelFieldKey.serialNumber,
+                      fSerial,
                       letterSpacing: LabelTypography.textTracking,
                     ),
                   ),
@@ -504,13 +575,12 @@ class BrowserPdfGenerator {
                   width: centerW,
                   height: dualLineH,
                   child: pw.Text(
-                    values.content,
+                    fieldText(LabelFieldKey.codeData, 'CODE', values.content),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
-                      font: labelFont,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: fContent,
+                    style: fieldStyle(
+                      LabelFieldKey.codeData,
+                      fContent,
                       letterSpacing: LabelTypography.textTracking,
                     ),
                   ),
@@ -533,16 +603,14 @@ class BrowserPdfGenerator {
                   width: singleTextW,
                   height: singleLineH,
                   child: pw.Text(
-                    label.company.isEmpty
-                        ? 'COMPANY NAME'
-                        : label.company.toUpperCase(),
+                    fieldText(
+                      LabelFieldKey.companyName,
+                      'COMPANY',
+                      label.company.toUpperCase(),
+                    ),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
-                      font: labelFont,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: fCompany,
-                    ),
+                    style: fieldStyle(LabelFieldKey.companyName, fCompany),
                   ),
                 ),
               if (visible(LabelFieldKey.companyAddress) &&
@@ -552,12 +620,16 @@ class BrowserPdfGenerator {
                   width: singleTextW,
                   height: singleLineH,
                   child: pw.Text(
-                    label.companyAddress,
+                    fieldText(
+                      LabelFieldKey.companyAddress,
+                      'ADDRESS',
+                      label.companyAddress,
+                    ),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
-                      font: labelFont,
-                      fontSize: fAddress,
+                    style: fieldStyle(
+                      LabelFieldKey.companyAddress,
+                      fAddress,
                       color: PdfColors.grey700,
                     ),
                   ),
@@ -570,14 +642,14 @@ class BrowserPdfGenerator {
                   child: pw.Text(
                     values.partNumber.isEmpty
                         ? label.title
-                        : 'PART NO: ${values.partNumber}',
+                        : fieldText(
+                            LabelFieldKey.partNumber,
+                            'PART NO',
+                            values.partNumber,
+                          ),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
-                      font: labelFont,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: fPart,
-                    ),
+                    style: fieldStyle(LabelFieldKey.partNumber, fPart),
                   ),
                 ),
               if (showItem)
@@ -586,10 +658,10 @@ class BrowserPdfGenerator {
                   width: singleTextW,
                   height: singleLineH,
                   child: pw.Text(
-                    'ITEM: ${label.itemName}',
+                    fieldText(LabelFieldKey.itemName, 'ITEM', label.itemName),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(font: labelFont, fontSize: fItem),
+                    style: fieldStyle(LabelFieldKey.itemName, fItem),
                   ),
                 ),
               if (showSingleModelPort)
@@ -597,16 +669,36 @@ class BrowserPdfGenerator {
                   element: LabelLayoutElement.singleModelPort,
                   width: singleTextW,
                   height: singleLineH,
-                  child: pw.Text(
-                    showModel
-                        ? 'MODEL: ${label.model.isEmpty ? '-' : label.model}${showPort ? '    ${label.port}' : ''}'
-                        : label.port,
+                  child: pw.RichText(
+                    text: pw.TextSpan(
+                      children: [
+                        if (showModel)
+                          pw.TextSpan(
+                            text: fieldText(
+                              LabelFieldKey.model,
+                              'MODEL',
+                              label.model,
+                            ),
+                            style: fieldStyle(LabelFieldKey.model, fModel),
+                          ),
+                        if (showModel && showPort)
+                          pw.TextSpan(
+                            text: '    ',
+                            style: fieldStyle(LabelFieldKey.model, fModel),
+                          ),
+                        if (showPort)
+                          pw.TextSpan(
+                            text: fieldText(
+                              LabelFieldKey.port,
+                              'PORT',
+                              label.port,
+                            ),
+                            style: fieldStyle(LabelFieldKey.port, fPort),
+                          ),
+                      ],
+                    ),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
-                      font: labelFont,
-                      fontSize: math.max(fModel, fPort),
-                    ),
                   ),
                 ),
               if (visible(LabelFieldKey.serialNumber))
@@ -615,23 +707,38 @@ class BrowserPdfGenerator {
                   width: singleTextW,
                   height: singleLineH,
                   child: pw.Text(
-                    'SERIAL NO: ${values.serialNumber.isEmpty ? '-' : values.serialNumber}',
+                    fieldText(
+                      LabelFieldKey.serialNumber,
+                      'SERIAL NO',
+                      values.serialNumber,
+                    ),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(
-                      font: labelFont,
-                      fontWeight: pw.FontWeight.bold,
-                      fontSize: fSerial,
-                    ),
+                    style: fieldStyle(LabelFieldKey.serialNumber, fSerial),
                   ),
                 ),
-              if (showDateTime)
+              if (showDate)
                 positionedElement(
-                  element: LabelLayoutElement.singleDateTime,
+                  element: LabelLayoutElement.singleDate,
                   width: singleTextW,
                   height: singleLineH,
-                  child: dateTimeText(
-                    pw.TextStyle(font: labelFont, fontSize: fDateTime),
+                  child: pw.Text(
+                    fieldText(LabelFieldKey.date, 'DATE', label.dateText),
+                    maxLines: 1,
+                    overflow: pw.TextOverflow.clip,
+                    style: fieldStyle(LabelFieldKey.date, fDate),
+                  ),
+                ),
+              if (showTime)
+                positionedElement(
+                  element: LabelLayoutElement.singleTime,
+                  width: singleTextW,
+                  height: singleLineH,
+                  child: pw.Text(
+                    fieldText(LabelFieldKey.time, 'TIME', label.timeText),
+                    maxLines: 1,
+                    overflow: pw.TextOverflow.clip,
+                    style: fieldStyle(LabelFieldKey.time, fTime),
                   ),
                 ),
               if (visible(LabelFieldKey.barcode))
@@ -651,10 +758,10 @@ class BrowserPdfGenerator {
                   width: singleTextW,
                   height: codeLineH,
                   child: pw.Text(
-                    values.content,
+                    fieldText(LabelFieldKey.codeData, 'CODE', values.content),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
-                    style: pw.TextStyle(font: labelFont, fontSize: fContent),
+                    style: fieldStyle(LabelFieldKey.codeData, fContent),
                   ),
                 ),
             ],

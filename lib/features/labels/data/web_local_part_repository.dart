@@ -40,6 +40,9 @@ class WebLocalPartRepository implements PartRepository {
       ),
       scanValueSource:
           payload['scan_value_source'] as String? ?? 'encoded_text',
+      labelLayout: labelLayoutFromDynamic(
+        payload['label_layout'] ?? payload['label_layout_config'],
+      ),
     );
   }
 
@@ -72,20 +75,24 @@ class WebLocalPartRepository implements PartRepository {
   Future<PartRecord> create(String tenantId, Map<String, dynamic> data) async {
     const uuid = Uuid();
     final id = uuid.v4();
+    final normalized = normalizePartMutationPayload(data);
     final payload = {
       'id': id,
       'tenant_id': tenantId,
-      'part_number': data['part_number'],
-      'item_name': data['item_name'],
-      'item_model': data['item_model'],
-      'default_dr_code': data['default_dr_code'],
-      'default_pack_quantity': data['default_pack_quantity'],
-      'barcode_type': data['barcode_type'],
-      'label_company_name': data['label_company_name'],
-      'label_company_address': data['label_company_address'],
-      'label_field_config': data['label_field_config'],
-      'dynamic_label_fields': data['dynamic_label_fields'],
-      'scan_value_source': data['scan_value_source'] ?? 'encoded_text',
+      'part_number': normalized['part_number'],
+      'item_name': normalized['item_name'],
+      'item_model': normalized['item_model'],
+      'default_dr_code': normalized['default_dr_code'],
+      'default_pack_quantity': normalized['default_pack_quantity'],
+      'barcode_type': normalized['barcode_type'],
+      'label_company_name': normalized['label_company_name'],
+      'label_company_address': normalized['label_company_address'],
+      'label_field_config': normalized['label_field_config'],
+      'dynamic_label_fields': normalized['dynamic_label_fields'],
+      'scan_value_source': normalized['scan_value_source'] ?? 'encoded_text',
+      'label_layout':
+          normalized['label_layout'] ??
+          labelLayoutToJson(labelLayoutFromDynamic(null)),
     };
 
     final db = _db(tenantId);
@@ -115,6 +122,7 @@ class WebLocalPartRepository implements PartRepository {
     Map<String, dynamic> data,
   ) async {
     final db = _db(tenantId);
+    final normalized = normalizePartMutationPayload(data);
     final existing =
         await (db.select(
               db.cachedParts,
@@ -122,38 +130,42 @@ class WebLocalPartRepository implements PartRepository {
             .getSingle();
 
     final payload = jsonDecode(existing.payloadJson) as Map<String, dynamic>;
-    if (data.containsKey('part_number')) {
-      payload['part_number'] = data['part_number'];
+    if (normalized.containsKey('part_number')) {
+      payload['part_number'] = normalized['part_number'];
     }
-    if (data.containsKey('item_name')) {
-      payload['item_name'] = data['item_name'];
+    if (normalized.containsKey('item_name')) {
+      payload['item_name'] = normalized['item_name'];
     }
-    if (data.containsKey('item_model')) {
-      payload['item_model'] = data['item_model'];
+    if (normalized.containsKey('item_model')) {
+      payload['item_model'] = normalized['item_model'];
     }
-    if (data.containsKey('default_dr_code')) {
-      payload['default_dr_code'] = data['default_dr_code'];
+    if (normalized.containsKey('default_dr_code')) {
+      payload['default_dr_code'] = normalized['default_dr_code'];
     }
-    if (data.containsKey('default_pack_quantity')) {
-      payload['default_pack_quantity'] = data['default_pack_quantity'];
+    if (normalized.containsKey('default_pack_quantity')) {
+      payload['default_pack_quantity'] = normalized['default_pack_quantity'];
     }
-    if (data.containsKey('barcode_type')) {
-      payload['barcode_type'] = data['barcode_type'];
+    if (normalized.containsKey('barcode_type')) {
+      payload['barcode_type'] = normalized['barcode_type'];
     }
-    if (data.containsKey('label_company_name')) {
-      payload['label_company_name'] = data['label_company_name'];
+    if (normalized.containsKey('label_company_name')) {
+      payload['label_company_name'] = normalized['label_company_name'];
     }
-    if (data.containsKey('label_company_address')) {
-      payload['label_company_address'] = data['label_company_address'];
+    if (normalized.containsKey('label_company_address')) {
+      payload['label_company_address'] = normalized['label_company_address'];
     }
-    if (data.containsKey('label_field_config')) {
-      payload['label_field_config'] = data['label_field_config'];
+    if (normalized.containsKey('label_field_config')) {
+      payload['label_field_config'] = normalized['label_field_config'];
     }
-    if (data.containsKey('dynamic_label_fields')) {
-      payload['dynamic_label_fields'] = data['dynamic_label_fields'];
+    if (normalized.containsKey('dynamic_label_fields')) {
+      payload['dynamic_label_fields'] = normalized['dynamic_label_fields'];
     }
-    if (data.containsKey('scan_value_source')) {
-      payload['scan_value_source'] = data['scan_value_source'];
+    if (normalized.containsKey('scan_value_source')) {
+      payload['scan_value_source'] = normalized['scan_value_source'];
+    }
+    if (normalized.containsKey('label_layout')) {
+      payload['label_layout'] = normalized['label_layout'];
+      payload.remove('label_layout_config');
     }
 
     final changed =

@@ -1,6 +1,44 @@
+import 'dart:convert';
+
 import '../../../core/network/api_client.dart';
 import '../domain/label_field_config.dart';
 import '../domain/dynamic_label_field.dart';
+import '../domain/label_layout.dart';
+
+/// Accepts both the object returned by the API and the encoded value stored in
+/// local settings. Malformed or legacy records safely fall back to the default
+/// layout instead of making the whole Part Master list unreadable.
+LabelLayout labelLayoutFromDynamic(Object? value) {
+  if (value is LabelLayout) return value;
+  try {
+    if (value is String) return LabelLayout.fromEncodedJson(value);
+    if (value is Map) return LabelLayout.fromEncodedJson(jsonEncode(value));
+  } on FormatException {
+    // A corrupt optional layout must not prevent the part itself from loading.
+  }
+  return LabelLayout.defaults();
+}
+
+extension LabelLayoutJsonObject on LabelLayout {
+  /// JSON-ready representation for Part Master API/cache payloads.
+  Map<String, dynamic> toJsonObject() =>
+      jsonDecode(toEncodedJson()) as Map<String, dynamic>;
+}
+
+Map<String, dynamic> labelLayoutToJson(LabelLayout layout) =>
+    layout.toJsonObject();
+
+Map<String, dynamic> normalizePartMutationPayload(Map<String, dynamic> data) {
+  if (!data.containsKey('label_layout') &&
+      !data.containsKey('label_layout_config')) {
+    return data;
+  }
+  final raw = data['label_layout'] ?? data['label_layout_config'];
+  return {
+    ...data,
+    'label_layout': labelLayoutToJson(labelLayoutFromDynamic(raw)),
+  }..remove('label_layout_config');
+}
 
 class PartRecord {
   PartRecord({
@@ -17,14 +55,18 @@ class PartRecord {
     Map<LabelFieldKey, LabelFieldSetting>? labelFieldSettings,
     List<DynamicLabelField>? dynamicFields,
     this.scanValueSource = 'encoded_text',
+    LabelLayout? labelLayout,
   }) : labelFieldSettings = LabelFieldConfig.mergeWithDefaults(
          labelFieldSettings,
        ),
-       dynamicFields = List.unmodifiable(dynamicFields ?? const []);
+       dynamicFields = List.unmodifiable(dynamicFields ?? const []),
+       labelLayout = labelLayout ?? LabelLayout.defaults();
 
   factory PartRecord.fromJson(Map<String, dynamic> json) {
     final dynamic configValue =
         json['label_field_config'] ?? json['label_config'];
+    final dynamic layoutValue =
+        json['label_layout'] ?? json['label_layout_config'];
     return PartRecord(
       id: json['id'] as String,
       number: json['part_number'] as String,
@@ -47,6 +89,7 @@ class PartRecord {
         json['dynamic_label_fields'],
       ),
       scanValueSource: json['scan_value_source'] as String? ?? 'encoded_text',
+      labelLayout: labelLayoutFromDynamic(layoutValue),
     );
   }
 
@@ -63,6 +106,7 @@ class PartRecord {
   final Map<LabelFieldKey, LabelFieldSetting> labelFieldSettings;
   final List<DynamicLabelField> dynamicFields;
   final String scanValueSource;
+  final LabelLayout labelLayout;
 }
 
 /// Abstract interface — implemented by [CloudPartRepository] (web/mobile) and
@@ -97,9 +141,10 @@ class CloudPartRepository implements PartRepository {
 
   @override
   Future<PartRecord> create(String tenantId, Map<String, dynamic> data) async {
+    final payload = normalizePartMutationPayload(data);
     final response = await _client.dio.post<Map<String, dynamic>>(
       '/tenants/$tenantId/parts',
-      data: data,
+      data: payload,
     );
     return PartRecord.fromJson(response.data!['data'] as Map<String, dynamic>);
   }
@@ -110,9 +155,10 @@ class CloudPartRepository implements PartRepository {
     PartRecord part,
     Map<String, dynamic> data,
   ) async {
+    final payload = normalizePartMutationPayload(data);
     final response = await _client.dio.put<Map<String, dynamic>>(
       '/tenants/$tenantId/parts/${part.id}',
-      data: {...data, 'version': part.version},
+      data: {...payload, 'version': part.version},
     );
     return PartRecord.fromJson(response.data!['data'] as Map<String, dynamic>);
   }

@@ -184,6 +184,64 @@ void main() {
     expect(bytes.take(4), equals('%PDF'.codeUnits));
   });
 
+  test(
+    'PDF renders independent date/time and field typography controls',
+    () async {
+      final settings = LabelFieldConfig.defaults();
+      settings[LabelFieldKey.partNumber] = const LabelFieldSetting(
+        visible: true,
+        fontSize: 60,
+        showCaption: false,
+        fontStyle: LabelFontStyle.italic,
+        fontWeight: LabelFontWeight.regular,
+      );
+      settings[LabelFieldKey.date] = const LabelFieldSetting(
+        visible: true,
+        fontSize: 18,
+        showCaption: false,
+        fontStyle: LabelFontStyle.italic,
+        fontWeight: LabelFontWeight.medium,
+      );
+      settings[LabelFieldKey.time] = const LabelFieldSetting(
+        visible: true,
+        fontSize: 16,
+        showCaption: true,
+        fontWeight: LabelFontWeight.black,
+      );
+
+      for (final dualSideCodes in [false, true]) {
+        final bytes = await const BrowserPdfGenerator().generate(
+          BrowserLabelDocument(
+            title: 'PART NO: P-1',
+            content: 'P-1-001',
+            widthMm: 100,
+            heightMm: 30,
+            symbology: 'data_matrix',
+            partNumber: 'P-1',
+            model: 'M-1',
+            port: 'PORT 1',
+            dateText: '12-08-2026',
+            timeText: '21:30:00',
+            dualSideCodes: dualSideCodes,
+            fieldSettings: settings,
+            dynamicFields: const [
+              DynamicLabelField(
+                id: 'batch',
+                label: 'Batch',
+                value: 'B-1',
+                fontSize: 60,
+                showCaption: false,
+                fontStyle: LabelFontStyle.italic,
+                fontWeight: LabelFontWeight.semiBold,
+              ),
+            ],
+          ),
+        );
+        expect(bytes.take(4), equals('%PDF'.codeUnits));
+      }
+    },
+  );
+
   test('layout positions preserve extended horizontal dragging', () {
     const position = LabelLayoutPosition(x: 1.75, y: .5, rotation: 1.2);
     expect(position.clamp().x, 1.75);
