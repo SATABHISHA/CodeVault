@@ -20,6 +20,8 @@ class AppShell extends ConsumerWidget {
     (Icons.admin_panel_settings_outlined, 'Administration', '/administration'),
     (Icons.payments_outlined, 'Billing', '/billing'),
     (Icons.auto_awesome_mosaic_outlined, 'Label studio', '/studio'),
+    // FUTURE BTW WORKSPACE: uncomment to restore the web/mobile menu item.
+    // (Icons.description_outlined, 'BTW label studio', '/btw-studio'),
     (Icons.backup_outlined, 'Backup', '/backup'),
     (Icons.support_agent_outlined, 'Support', '/support'),
     (Icons.person_outline, 'Profile', '/profile'),
@@ -47,6 +49,8 @@ class AppShell extends ConsumerWidget {
               'Label studio',
               '/windows/operations',
             ),
+            // FUTURE BTW WORKSPACE: uncomment to restore the Windows menu item.
+            // (Icons.description_outlined, 'BTW label studio', '/btw-studio'),
             (Icons.backup_outlined, 'Local backup', '/backup'),
             (Icons.group_outlined, 'Local users', '/windows/users'),
             (Icons.person_outline, 'Profile', '/profile'),
@@ -78,7 +82,19 @@ class AppShell extends ConsumerWidget {
       ),
     );
     if (size == LayoutSize.compact) {
-      final compactDestinations = destinations.take(4).toList();
+      const compactPaths = {
+        '/dashboard',
+        '/windows/dashboard',
+        '/studio',
+        '/windows/operations',
+        // FUTURE BTW WORKSPACE: uncomment with the menu/route blocks above.
+        // '/btw-studio',
+        '/backup',
+      };
+      final compactDestinations = destinations
+          .where((item) => compactPaths.contains(item.$3))
+          .take(4)
+          .toList();
       final compactSelected = compactDestinations
           .indexWhere((item) => item.$3 == location)
           .clamp(0, compactDestinations.length - 1);

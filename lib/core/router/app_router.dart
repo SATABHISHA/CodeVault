@@ -8,6 +8,8 @@ import 'package:codevault/features/authentication/presentation/forgot_password_s
 import 'package:codevault/features/labels/presentation/label_studio_screen.dart';
 import 'package:codevault/features/backup/presentation/backup_screen.dart';
 import 'package:codevault/features/billing/presentation/billing_screen.dart';
+// FUTURE BTW WORKSPACE: uncomment this import and the /btw-studio route below.
+// import 'package:codevault/features/btw/presentation/btw_studio_screen.dart';
 import 'package:codevault/features/dashboard/presentation/app_shell.dart';
 import 'package:codevault/features/dashboard/presentation/dashboard_screen.dart';
 import 'package:codevault/features/settings/presentation/about_screen.dart';
@@ -97,6 +99,11 @@ final appRouterProvider = Provider<GoRouter>(
             path: '/studio',
             builder: (context, state) => const LabelStudioScreen(),
           ),
+          // FUTURE BTW WORKSPACE: uncomment to restore the page on all platforms.
+          // GoRoute(
+          //   path: '/btw-studio',
+          //   builder: (context, state) => const BtwStudioScreen(),
+          // ),
           GoRoute(
             path: '/web/print',
             builder: (context, state) => const LabelStudioScreen(),

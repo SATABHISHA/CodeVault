@@ -34,9 +34,26 @@ import '../domain/label_typography.dart';
 enum _WindowsPrintAction { print, exportPdf }
 
 class LabelStudioScreen extends ConsumerStatefulWidget {
-  const LabelStudioScreen({super.key, this.repository, this.printGateway});
+  const LabelStudioScreen({
+    super.key,
+    this.repository,
+    this.printGateway,
+    this.workspaceTitle = 'Label Production Studio',
+    this.workspaceSubtitle =
+        'Build, preview and print traceable industrial labels',
+    this.recordCollectionName = 'Part Master',
+    this.leadingContent,
+  });
   final PartRepository? repository;
   final BrowserPrintGateway? printGateway;
+  final String workspaceTitle;
+  final String workspaceSubtitle;
+  final String recordCollectionName;
+
+  /// Optional content that participates in the studio's own scroll view.
+  /// This avoids nested or height-constrained scrolling for specialized
+  /// workspaces while leaving the standard Label Studio unchanged.
+  final Widget? leadingContent;
 
   @override
   ConsumerState<LabelStudioScreen> createState() => _LabelStudioScreenState();
@@ -503,6 +520,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     }
     return CustomScrollView(
       slivers: [
+        if (widget.leadingContent != null)
+          SliverToBoxAdapter(child: widget.leadingContent),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
           sliver: SliverToBoxAdapter(child: _header(context)),
@@ -566,21 +585,21 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       spacing: 20,
       runSpacing: 16,
       children: [
-        const Column(
+        Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Label Production Studio',
-              style: TextStyle(
+              widget.workspaceTitle,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            SizedBox(height: 5),
+            const SizedBox(height: 5),
             Text(
-              'Build, preview and print traceable industrial labels',
-              style: TextStyle(color: Colors.white70, fontSize: 15),
+              widget.workspaceSubtitle,
+              style: const TextStyle(color: Colors.white70, fontSize: 15),
             ),
           ],
         ),
@@ -884,7 +903,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
 
   Widget _catalog(BuildContext context) => _panel(
     context,
-    title: 'Part master',
+    title: widget.recordCollectionName,
     icon: Icons.view_list_rounded,
     trailing: IconButton(
       onPressed: _load,
@@ -1583,7 +1602,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
               OutlinedButton.icon(
                 onPressed: busy ? null : _savePartMasterWithLayout,
                 icon: const Icon(Icons.save_outlined),
-                label: const Text('Save Part Master & Layout'),
+                label: Text('Save ${widget.recordCollectionName} & Layout'),
               ),
               OutlinedButton.icon(
                 onPressed: busy ? null : () => _resetLabelLayout(notify: true),
