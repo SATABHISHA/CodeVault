@@ -699,7 +699,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
           children: [
             Expanded(child: _field(dr, 'DR code', Icons.qr_code)),
             const SizedBox(width: 12),
-            Expanded(child: _field(pack, 'Pack qty', Icons.inventory)),
+            Expanded(
+              child: _field(pack, 'Print Qty Per Page', Icons.inventory),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -752,7 +754,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: _field(quantity, 'Print qty', Icons.copy, number: true),
+              child: _field(quantity, 'Pack Qty', Icons.copy, number: true),
             ),
           ],
         ),
