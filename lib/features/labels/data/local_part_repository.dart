@@ -17,6 +17,8 @@ class LocalPartRepository implements PartRepository {
   static const _dynamicFieldsPrefix = 'part-dynamic-fields:';
   static const _scanValueSourcePrefix = 'part-scan-source:';
   static const _labelLayoutPrefix = 'part-label-layout:';
+  static const _labelProfilePrefix = 'part-label-profile:';
+  static const _codeSizePrefix = 'part-code-size:';
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -24,6 +26,8 @@ class LocalPartRepository implements PartRepository {
   String _dynamicFieldsKey(String partId) => '$_dynamicFieldsPrefix$partId';
   String _scanValueSourceKey(String partId) => '$_scanValueSourcePrefix$partId';
   String _labelLayoutKey(String partId) => '$_labelLayoutPrefix$partId';
+  String _labelProfileKey(String partId) => '$_labelProfilePrefix$partId';
+  String _codeSizeKey(String partId) => '$_codeSizePrefix$partId';
 
   PartRecord _fromRow(
     Part row, {
@@ -31,22 +35,32 @@ class LocalPartRepository implements PartRepository {
     String? dynamicFieldsJson,
     String? scanValueSource,
     String? labelLayoutJson,
-  }) => PartRecord(
-    id: row.id,
-    number: row.description ?? row.id, // description stores the part number
-    name: row.item,
-    model: row.model ?? '',
-    drCode: row.defaultDrCode ?? '',
-    packQuantity: row.defaultPackQuantity,
-    barcodeType: row.barcodeType,
-    version: 1,
-    labelCompanyName: row.labelCompanyName ?? '',
-    labelCompanyAddress: row.labelCompanyAddress ?? '',
-    labelFieldSettings: LabelFieldConfig.fromEncodedJson(configJson),
-    dynamicFields: DynamicLabelField.listFromDynamic(dynamicFieldsJson),
-    scanValueSource: scanValueSource ?? 'encoded_text',
-    labelLayout: labelLayoutFromDynamic(labelLayoutJson),
-  );
+    String? labelProfileJson,
+    String? codeSizeJson,
+  }) {
+    final labelProfile = labelProfileFromDynamic(labelProfileJson);
+    final codeSize = labelCodeScalesFromDynamic(codeSizeJson);
+    return PartRecord(
+      id: row.id,
+      number: row.description ?? row.id, // description stores the part number
+      name: row.item,
+      model: row.model ?? '',
+      drCode: row.defaultDrCode ?? '',
+      packQuantity: row.defaultPackQuantity,
+      barcodeType: row.barcodeType,
+      version: 1,
+      labelCompanyName: row.labelCompanyName ?? '',
+      labelCompanyAddress: row.labelCompanyAddress ?? '',
+      labelFieldSettings: LabelFieldConfig.fromEncodedJson(configJson),
+      dynamicFields: DynamicLabelField.listFromDynamic(dynamicFieldsJson),
+      scanValueSource: scanValueSource ?? 'encoded_text',
+      labelLayout: labelLayoutFromDynamic(labelLayoutJson),
+      labelWidthMm: labelProfile.widthMm,
+      labelHeightMm: labelProfile.heightMm,
+      codeWidthScale: codeSize.widthScale,
+      codeHeightScale: codeSize.heightScale,
+    );
+  }
 
   Future<Map<String, String>> _loadSettingsByPartIds(
     String tenantId,
@@ -138,6 +152,40 @@ class LocalPartRepository implements PartRepository {
         ),
       );
 
+  Future<void> _saveLabelProfile(
+    String tenantId,
+    String partId,
+    Object? rawProfile,
+  ) => _db
+      .into(_db.localSettings)
+      .insertOnConflictUpdate(
+        LocalSettingsCompanion.insert(
+          companyId: tenantId,
+          key: _labelProfileKey(partId),
+          value: jsonEncode(
+            labelProfileToJson(labelProfileFromDynamic(rawProfile)),
+          ),
+        ),
+      );
+
+  Future<void> _saveCodeSize(
+    String tenantId,
+    String partId, {
+    required Object? widthScale,
+    required Object? heightScale,
+  }) => _db
+      .into(_db.localSettings)
+      .insertOnConflictUpdate(
+        LocalSettingsCompanion.insert(
+          companyId: tenantId,
+          key: _codeSizeKey(partId),
+          value: jsonEncode({
+            'code_width_scale': normalizeLabelCodeScale(widthScale),
+            'code_height_scale': normalizeLabelCodeScale(heightScale),
+          }),
+        ),
+      );
+
   // ── interface ─────────────────────────────────────────────────────────────
 
   @override
@@ -171,6 +219,16 @@ class LocalPartRepository implements PartRepository {
       ids,
       _labelLayoutPrefix,
     );
+    final labelProfiles = await _loadSettingsByPartIds(
+      tenantId,
+      ids,
+      _labelProfilePrefix,
+    );
+    final codeSizes = await _loadSettingsByPartIds(
+      tenantId,
+      ids,
+      _codeSizePrefix,
+    );
     return rows
         .map(
           (row) => _fromRow(
@@ -179,6 +237,8 @@ class LocalPartRepository implements PartRepository {
             dynamicFieldsJson: dynamicFields[row.id],
             scanValueSource: scanValueSources[row.id],
             labelLayoutJson: labelLayouts[row.id],
+            labelProfileJson: labelProfiles[row.id],
+            codeSizeJson: codeSizes[row.id],
           ),
         )
         .toList();
@@ -217,6 +277,13 @@ class LocalPartRepository implements PartRepository {
       id,
       data['label_layout'] ?? data['label_layout_config'],
     );
+    await _saveLabelProfile(tenantId, id, data['label_profile']);
+    await _saveCodeSize(
+      tenantId,
+      id,
+      widthScale: data['code_width_scale'],
+      heightScale: data['code_height_scale'],
+    );
     final row = await (_db.select(
       _db.parts,
     )..where((t) => t.id.equals(id))).getSingle();
@@ -247,12 +314,27 @@ class LocalPartRepository implements PartRepository {
                   t.key.equals(_labelLayoutKey(id)),
             ))
             .getSingleOrNull();
+    final labelProfile =
+        await (_db.select(_db.localSettings)..where(
+              (t) =>
+                  t.companyId.equals(tenantId) &
+                  t.key.equals(_labelProfileKey(id)),
+            ))
+            .getSingleOrNull();
+    final codeSize =
+        await (_db.select(_db.localSettings)..where(
+              (t) =>
+                  t.companyId.equals(tenantId) & t.key.equals(_codeSizeKey(id)),
+            ))
+            .getSingleOrNull();
     return _fromRow(
       row,
       configJson: config?.value,
       dynamicFieldsJson: dynamicFields?.value,
       scanValueSource: scanValueSource?.value,
       labelLayoutJson: labelLayout?.value,
+      labelProfileJson: labelProfile?.value,
+      codeSizeJson: codeSize?.value,
     );
   }
 
@@ -299,6 +381,18 @@ class LocalPartRepository implements PartRepository {
         data['label_layout'] ?? data['label_layout_config'],
       );
     }
+    if (data.containsKey('label_profile')) {
+      await _saveLabelProfile(tenantId, part.id, data['label_profile']);
+    }
+    if (data.containsKey('code_width_scale') ||
+        data.containsKey('code_height_scale')) {
+      await _saveCodeSize(
+        tenantId,
+        part.id,
+        widthScale: data['code_width_scale'] ?? part.codeWidthScale,
+        heightScale: data['code_height_scale'] ?? part.codeHeightScale,
+      );
+    }
     final row =
         await (_db.select(_db.parts)..where(
               (t) => t.companyId.equals(tenantId) & t.id.equals(part.id),
@@ -332,12 +426,28 @@ class LocalPartRepository implements PartRepository {
                   t.key.equals(_labelLayoutKey(part.id)),
             ))
             .getSingleOrNull();
+    final labelProfile =
+        await (_db.select(_db.localSettings)..where(
+              (t) =>
+                  t.companyId.equals(tenantId) &
+                  t.key.equals(_labelProfileKey(part.id)),
+            ))
+            .getSingleOrNull();
+    final codeSize =
+        await (_db.select(_db.localSettings)..where(
+              (t) =>
+                  t.companyId.equals(tenantId) &
+                  t.key.equals(_codeSizeKey(part.id)),
+            ))
+            .getSingleOrNull();
     return _fromRow(
       row,
       configJson: config?.value,
       dynamicFieldsJson: dynamicFields?.value,
       scanValueSource: scanValueSource?.value,
       labelLayoutJson: labelLayout?.value,
+      labelProfileJson: labelProfile?.value,
+      codeSizeJson: codeSize?.value,
     );
   }
 
@@ -350,7 +460,9 @@ class LocalPartRepository implements PartRepository {
               (t.key.equals(_configKey(id)) |
                   t.key.equals(_dynamicFieldsKey(id)) |
                   t.key.equals(_scanValueSourceKey(id)) |
-                  t.key.equals(_labelLayoutKey(id))),
+                  t.key.equals(_labelLayoutKey(id)) |
+                  t.key.equals(_labelProfileKey(id)) |
+                  t.key.equals(_codeSizeKey(id))),
         ))
         .go();
   }

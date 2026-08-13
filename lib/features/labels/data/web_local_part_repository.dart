@@ -21,6 +21,11 @@ class WebLocalPartRepository implements PartRepository {
 
   PartRecord _fromRow(CachedPart row) {
     final payload = jsonDecode(row.payloadJson) as Map<String, dynamic>;
+    final labelProfile = labelProfileFromDynamic(
+      payload['label_profile'],
+      widthMm: payload['label_width_mm'],
+      heightMm: payload['label_height_mm'],
+    );
     return PartRecord(
       id: row.id,
       number: payload['part_number'] as String? ?? row.id,
@@ -43,6 +48,10 @@ class WebLocalPartRepository implements PartRepository {
       labelLayout: labelLayoutFromDynamic(
         payload['label_layout'] ?? payload['label_layout_config'],
       ),
+      labelWidthMm: labelProfile.widthMm,
+      labelHeightMm: labelProfile.heightMm,
+      codeWidthScale: normalizeLabelCodeScale(payload['code_width_scale']),
+      codeHeightScale: normalizeLabelCodeScale(payload['code_height_scale']),
     );
   }
 
@@ -93,6 +102,15 @@ class WebLocalPartRepository implements PartRepository {
       'label_layout':
           normalized['label_layout'] ??
           labelLayoutToJson(labelLayoutFromDynamic(null)),
+      'label_profile': labelProfileToJson(
+        labelProfileFromDynamic(normalized['label_profile']),
+      ),
+      'code_width_scale': normalizeLabelCodeScale(
+        normalized['code_width_scale'],
+      ),
+      'code_height_scale': normalizeLabelCodeScale(
+        normalized['code_height_scale'],
+      ),
     };
 
     final db = _db(tenantId);
@@ -166,6 +184,18 @@ class WebLocalPartRepository implements PartRepository {
     if (normalized.containsKey('label_layout')) {
       payload['label_layout'] = normalized['label_layout'];
       payload.remove('label_layout_config');
+    }
+    if (normalized.containsKey('label_profile')) {
+      payload['label_profile'] = normalized['label_profile'];
+      payload
+        ..remove('label_width_mm')
+        ..remove('label_height_mm');
+    }
+    if (normalized.containsKey('code_width_scale')) {
+      payload['code_width_scale'] = normalized['code_width_scale'];
+    }
+    if (normalized.containsKey('code_height_scale')) {
+      payload['code_height_scale'] = normalized['code_height_scale'];
     }
 
     final changed =

@@ -1,9 +1,87 @@
 import 'dart:convert';
 
 import '../../../core/network/api_client.dart';
+import '../domain/label_code_size.dart';
 import '../domain/label_field_config.dart';
 import '../domain/dynamic_label_field.dart';
 import '../domain/label_layout.dart';
+
+export '../domain/label_code_size.dart';
+
+const double defaultLabelWidthMm = 100.0;
+const double defaultLabelHeightMm = 30.0;
+const double maxLabelWidthMm = 210.0;
+const double maxLabelHeightMm = 297.0;
+
+typedef LabelProfileDimensions = ({double widthMm, double heightMm});
+
+double? _validLabelDimension(Object? value, double maximum) {
+  final parsed = switch (value) {
+    num number => number.toDouble(),
+    String text => double.tryParse(text.trim()),
+    _ => null,
+  };
+  if (parsed == null || !parsed.isFinite || parsed <= 0 || parsed > maximum) {
+    return null;
+  }
+  return parsed;
+}
+
+/// Reads the per-Part Master sticker dimensions while keeping legacy records
+/// (which did not contain a profile) on the historical 100 x 30 mm default.
+LabelProfileDimensions labelProfileFromDynamic(
+  Object? value, {
+  Object? widthMm,
+  Object? heightMm,
+}) {
+  Object? decoded = value;
+  try {
+    if (value is String && value.trim().isNotEmpty) decoded = jsonDecode(value);
+  } on FormatException {
+    decoded = null;
+  }
+  final map = decoded is Map ? decoded : const <Object?, Object?>{};
+  final width = _validLabelDimension(
+    map['width_mm'] ?? map['widthMm'] ?? widthMm,
+    maxLabelWidthMm,
+  );
+  final height = _validLabelDimension(
+    map['height_mm'] ?? map['heightMm'] ?? heightMm,
+    maxLabelHeightMm,
+  );
+  if (width == null || height == null) {
+    return (widthMm: defaultLabelWidthMm, heightMm: defaultLabelHeightMm);
+  }
+  return (widthMm: width, heightMm: height);
+}
+
+Map<String, double> labelProfileToJson(LabelProfileDimensions profile) => {
+  'width_mm': profile.widthMm,
+  'height_mm': profile.heightMm,
+};
+
+({double widthScale, double heightScale}) labelCodeScalesFromDynamic(
+  Object? value,
+) {
+  Object? decoded = value;
+  try {
+    if (value is String && value.trim().isNotEmpty) {
+      decoded = jsonDecode(value);
+    }
+  } on FormatException {
+    decoded = null;
+  }
+  if (decoded is! Map) {
+    return (
+      widthScale: defaultLabelCodeScale,
+      heightScale: defaultLabelCodeScale,
+    );
+  }
+  return (
+    widthScale: normalizeLabelCodeScale(decoded['code_width_scale']),
+    heightScale: normalizeLabelCodeScale(decoded['code_height_scale']),
+  );
+}
 
 /// Accepts both the object returned by the API and the encoded value stored in
 /// local settings. Malformed or legacy records safely fall back to the default
@@ -29,15 +107,38 @@ Map<String, dynamic> labelLayoutToJson(LabelLayout layout) =>
     layout.toJsonObject();
 
 Map<String, dynamic> normalizePartMutationPayload(Map<String, dynamic> data) {
-  if (!data.containsKey('label_layout') &&
-      !data.containsKey('label_layout_config')) {
-    return data;
+  final normalized = <String, dynamic>{...data};
+  if (data.containsKey('label_profile') ||
+      data.containsKey('label_width_mm') ||
+      data.containsKey('label_height_mm')) {
+    normalized['label_profile'] = labelProfileToJson(
+      labelProfileFromDynamic(
+        data['label_profile'],
+        widthMm: data['label_width_mm'],
+        heightMm: data['label_height_mm'],
+      ),
+    );
+    normalized
+      ..remove('label_width_mm')
+      ..remove('label_height_mm');
   }
-  final raw = data['label_layout'] ?? data['label_layout_config'];
-  return {
-    ...data,
-    'label_layout': labelLayoutToJson(labelLayoutFromDynamic(raw)),
-  }..remove('label_layout_config');
+  if (data.containsKey('code_width_scale')) {
+    normalized['code_width_scale'] = normalizeLabelCodeScale(
+      data['code_width_scale'],
+    );
+  }
+  if (data.containsKey('code_height_scale')) {
+    normalized['code_height_scale'] = normalizeLabelCodeScale(
+      data['code_height_scale'],
+    );
+  }
+  if (data.containsKey('label_layout') ||
+      data.containsKey('label_layout_config')) {
+    final raw = data['label_layout'] ?? data['label_layout_config'];
+    normalized['label_layout'] = labelLayoutToJson(labelLayoutFromDynamic(raw));
+    normalized.remove('label_layout_config');
+  }
+  return normalized;
 }
 
 class PartRecord {
@@ -56,17 +157,34 @@ class PartRecord {
     List<DynamicLabelField>? dynamicFields,
     this.scanValueSource = 'encoded_text',
     LabelLayout? labelLayout,
+    double labelWidthMm = defaultLabelWidthMm,
+    double labelHeightMm = defaultLabelHeightMm,
+    double codeWidthScale = defaultLabelCodeScale,
+    double codeHeightScale = defaultLabelCodeScale,
   }) : labelFieldSettings = LabelFieldConfig.mergeWithDefaults(
          labelFieldSettings,
        ),
        dynamicFields = List.unmodifiable(dynamicFields ?? const []),
-       labelLayout = labelLayout ?? LabelLayout.defaults();
+       labelLayout = labelLayout ?? LabelLayout.defaults(),
+       labelWidthMm =
+           _validLabelDimension(labelWidthMm, maxLabelWidthMm) ??
+           defaultLabelWidthMm,
+       labelHeightMm =
+           _validLabelDimension(labelHeightMm, maxLabelHeightMm) ??
+           defaultLabelHeightMm,
+       codeWidthScale = normalizeLabelCodeScale(codeWidthScale),
+       codeHeightScale = normalizeLabelCodeScale(codeHeightScale);
 
   factory PartRecord.fromJson(Map<String, dynamic> json) {
     final dynamic configValue =
         json['label_field_config'] ?? json['label_config'];
     final dynamic layoutValue =
         json['label_layout'] ?? json['label_layout_config'];
+    final labelProfile = labelProfileFromDynamic(
+      json['label_profile'],
+      widthMm: json['label_width_mm'],
+      heightMm: json['label_height_mm'],
+    );
     return PartRecord(
       id: json['id'] as String,
       number: json['part_number'] as String,
@@ -90,6 +208,10 @@ class PartRecord {
       ),
       scanValueSource: json['scan_value_source'] as String? ?? 'encoded_text',
       labelLayout: labelLayoutFromDynamic(layoutValue),
+      labelWidthMm: labelProfile.widthMm,
+      labelHeightMm: labelProfile.heightMm,
+      codeWidthScale: normalizeLabelCodeScale(json['code_width_scale']),
+      codeHeightScale: normalizeLabelCodeScale(json['code_height_scale']),
     );
   }
 
@@ -107,6 +229,10 @@ class PartRecord {
   final List<DynamicLabelField> dynamicFields;
   final String scanValueSource;
   final LabelLayout labelLayout;
+  final double labelWidthMm;
+  final double labelHeightMm;
+  final double codeWidthScale;
+  final double codeHeightScale;
 }
 
 /// Abstract interface — implemented by [CloudPartRepository] (web/mobile) and

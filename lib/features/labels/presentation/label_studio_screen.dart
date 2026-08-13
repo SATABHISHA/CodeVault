@@ -101,6 +101,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   bool autoDateTime = true;
   bool autoIncrementPartNumber = false;
   bool autoIncrementSerialNumber = false;
+  double codeWidthScale = defaultLabelCodeScale;
+  double codeHeightScale = defaultLabelCodeScale;
   String symbology = 'data_matrix';
   String _scanValueSource = 'encoded_text';
   String labelSize = '100 × 30 mm';
@@ -1054,9 +1056,17 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                             100.0,
                             labelConstraints.maxWidth * .78,
                           );
+                          final dualCodeWidth = (qrSide * codeWidthScale).clamp(
+                            12.0,
+                            labelConstraints.maxWidth * .42,
+                          );
+                          final dualCodeHeight = (qrSide * codeHeightScale)
+                              .clamp(12.0, labelConstraints.maxHeight * .90);
                           final dualCenterWidth = math.max(
                             70.0,
-                            labelConstraints.maxWidth - (qrSide * 2) - 20,
+                            labelConstraints.maxWidth -
+                                (dualCodeWidth * 2) -
+                                20,
                           );
                           final dualModelWidth = dualCenterWidth * .62;
                           final dualPortWidth = dualCenterWidth * .34;
@@ -1080,8 +1090,14 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                   singleBarcodeHeight,
                                 );
                           final singleBarcodeSize = Size(
-                            singleBarcodeWidth,
-                            singleBarcodeHeight,
+                            (singleBarcodeWidth * codeWidthScale).clamp(
+                              12.0,
+                              labelConstraints.maxWidth,
+                            ),
+                            (singleBarcodeHeight * codeHeightScale).clamp(
+                              12.0,
+                              labelConstraints.maxHeight,
+                            ),
                           );
                           final area = Size(
                             labelConstraints.maxWidth,
@@ -1096,12 +1112,15 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                   _draggablePreviewFeature(
                                     area: area,
                                     element: LabelLayoutElement.dualLeftCode,
-                                    elementSize: Size.square(qrSide),
+                                    elementSize: Size(
+                                      dualCodeWidth,
+                                      dualCodeHeight,
+                                    ),
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     child: SizedBox(
-                                      width: qrSide,
-                                      height: qrSide,
+                                      width: dualCodeWidth,
+                                      height: dualCodeHeight,
                                       child: BarcodeView(
                                         data: scanData,
                                         symbology: codeSymbology,
@@ -1288,12 +1307,15 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                   _draggablePreviewFeature(
                                     area: area,
                                     element: LabelLayoutElement.dualRightCode,
-                                    elementSize: Size.square(qrSide),
+                                    elementSize: Size(
+                                      dualCodeWidth,
+                                      dualCodeHeight,
+                                    ),
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     child: SizedBox(
-                                      width: qrSide,
-                                      height: qrSide,
+                                      width: dualCodeWidth,
+                                      height: dualCodeHeight,
                                       child: BarcodeView(
                                         data: scanData,
                                         symbology: codeSymbology,
@@ -2889,7 +2911,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                 ],
               ),
             ),
-          ] else
+          ] else ...[
             Padding(
               padding: const EdgeInsets.only(top: 8, bottom: 4),
               child: Text(
@@ -2897,10 +2919,66 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                 style: Theme.of(context).textTheme.labelMedium,
               ),
             ),
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 220),
+              opacity: visible ? 1 : .55,
+              child: Column(
+                children: [
+                  _codeSizeSlider(
+                    label: 'Code width',
+                    value: codeWidthScale,
+                    sliderKey: const Key('code-width-scale'),
+                    onChanged: visible
+                        ? (value) => setState(() => codeWidthScale = value)
+                        : null,
+                  ),
+                  _codeSizeSlider(
+                    label: 'Code height',
+                    value: codeHeightScale,
+                    sliderKey: const Key('code-height-scale'),
+                    onChanged: visible
+                        ? (value) => setState(() => codeHeightScale = value)
+                        : null,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
+
+  Widget _codeSizeSlider({
+    required String label,
+    required double value,
+    required Key sliderKey,
+    required ValueChanged<double>? onChanged,
+  }) => Column(
+    children: [
+      Row(
+        children: [
+          Text(label, style: Theme.of(context).textTheme.labelMedium),
+          const Spacer(),
+          Text(
+            '${(value * 100).round()}%',
+            style: Theme.of(
+              context,
+            ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
+      ),
+      Slider.adaptive(
+        key: sliderKey,
+        value: value,
+        min: minLabelCodeScale,
+        max: maxLabelCodeScale,
+        divisions: 35,
+        label: '${(value * 100).round()}%',
+        onChanged: onChanged,
+      ),
+    ],
+  );
 
   Map<String, dynamic> get _payload => {
     'part_number': partNumber.text.trim(),
@@ -2909,6 +2987,12 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     'default_dr_code': dr.text.trim().isEmpty ? null : dr.text.trim(),
     'default_pack_quantity': int.tryParse(pack.text) ?? 1,
     'barcode_type': symbology,
+    'label_profile': labelProfileToJson((
+      widthMm: sizes[labelSize]!.$1,
+      heightMm: sizes[labelSize]!.$2,
+    )),
+    'code_width_scale': codeWidthScale,
+    'code_height_scale': codeHeightScale,
     'label_company_name': companyName.text.trim(),
     'label_company_address': companyAddress.text.trim(),
     'label_field_config': LabelFieldConfig.toJsonObject(_labelFieldSettings),
@@ -2970,6 +3054,15 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     symbology = ['qr', 'data_matrix', 'code128'].contains(part.barcodeType)
         ? part.barcodeType
         : 'code128';
+    codeWidthScale = part.codeWidthScale;
+    codeHeightScale = part.codeHeightScale;
+    final partLabelSize = _labelSizeName(part.labelWidthMm, part.labelHeightMm);
+    sizes.putIfAbsent(
+      partLabelSize,
+      () => (part.labelWidthMm, part.labelHeightMm),
+    );
+    labelSize = partLabelSize;
+    stickersPerRow = (maxPageWidthMm / part.labelWidthMm).floor().clamp(1, 999);
     _labelFieldSettings = LabelFieldConfig.mergeWithDefaults(
       part.labelFieldSettings,
     );
@@ -3177,6 +3270,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       widthMm: size.$1,
       heightMm: size.$2,
       symbology: symbology,
+      codeWidthScale: codeWidthScale,
+      codeHeightScale: codeHeightScale,
       itemName: withName ? itemName.text : '',
       model: model.text,
       partNumber: partNumber.text.trim(),
@@ -3388,6 +3483,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     serialIncrementBy.text = '1';
     autoIncrementPartNumber = false;
     autoIncrementSerialNumber = false;
+    codeWidthScale = defaultLabelCodeScale;
+    codeHeightScale = defaultLabelCodeScale;
+    labelSize = _labelSizeName(defaultLabelWidthMm, defaultLabelHeightMm);
+    stickersPerRow = maxStickersPerRow.clamp(1, 999);
     dr.text = 'NR';
     pack.text = '1';
     quantity.text = '1';

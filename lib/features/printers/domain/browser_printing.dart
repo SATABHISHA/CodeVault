@@ -7,6 +7,7 @@ import 'package:barcode/barcode.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
 import '../../labels/domain/label_field_config.dart';
+import '../../labels/domain/label_code_size.dart';
 import '../../labels/domain/dynamic_label_field.dart';
 import '../../labels/domain/label_layout.dart';
 import '../../labels/domain/label_typography.dart';
@@ -14,6 +15,20 @@ import '../../labels/domain/label_typography.dart';
 /// Flutter's preview canvas has a downward-positive Y axis, while PDF uses an
 /// upward-positive Y axis. Negating the angle preserves the visual direction.
 double pdfRotationFromPreview(double previewRotation) => -previewRotation;
+
+double clampLabelCodeDimension({
+  required double base,
+  required double scale,
+  required double maximum,
+}) {
+  if (!base.isFinite || !maximum.isFinite || base <= 0 || maximum <= 0) {
+    return 0;
+  }
+  final minimum = math.min(2.0, maximum);
+  return (base * normalizeLabelCodeScale(scale))
+      .clamp(minimum, maximum)
+      .toDouble();
+}
 
 /// Increments the last numeric segment while preserving its minimum width.
 /// Examples: `001` + 2 -> `003`, `PART-009` + 2 -> `PART-011`.
@@ -62,6 +77,8 @@ class BrowserLabelDocument {
     this.partNumberIncrement = 1,
     this.autoIncrementSerialNumber = false,
     this.serialNumberIncrement = 1,
+    this.codeWidthScale = defaultLabelCodeScale,
+    this.codeHeightScale = defaultLabelCodeScale,
   });
   final String title;
   final String content;
@@ -94,6 +111,8 @@ class BrowserLabelDocument {
   final int partNumberIncrement;
   final bool autoIncrementSerialNumber;
   final int serialNumberIncrement;
+  final double codeWidthScale;
+  final double codeHeightScale;
 
   ({String partNumber, String serialNumber, String content}) stickerValuesAt(
     int index,
@@ -147,6 +166,8 @@ class BrowserPdfGenerator {
     );
     final resolvedLayout = label.layout ?? LabelLayout.defaults();
     final twinCodes = label.dualSideCodes && label.symbology != 'code128';
+    final codeWidthScale = normalizeLabelCodeScale(label.codeWidthScale);
+    final codeHeightScale = normalizeLabelCodeScale(label.codeHeightScale);
 
     // ── Label dimensions in PDF points ──────────────────────────────────────
     final wPt = label.widthMm * PdfPageFormat.mm;
@@ -245,7 +266,17 @@ class BrowserPdfGenerator {
 
     // Use the same geometry intent as live preview.
     final twinSide = math.max(8.0, math.min(innerH * 0.52, innerW * 0.20));
-    final centerW = (innerW - (twinSide * 2) - (innerW * 0.04)).clamp(
+    final twinCodeW = clampLabelCodeDimension(
+      base: twinSide,
+      scale: codeWidthScale,
+      maximum: innerW * 0.42,
+    );
+    final twinCodeH = clampLabelCodeDimension(
+      base: twinSide,
+      scale: codeHeightScale,
+      maximum: innerH * 0.90,
+    );
+    final centerW = (innerW - (twinCodeW * 2) - (innerW * 0.04)).clamp(
       innerW * 0.35,
       innerW,
     );
@@ -260,10 +291,20 @@ class BrowserPdfGenerator {
     final showDate = visible(LabelFieldKey.date);
     final showTime = visible(LabelFieldKey.time);
     // ── Barcode sizing ───────────────────────────────────────────────────────
-    final barcodeH = math.min(innerH * 0.42, innerW * 0.45);
-    final barcodeW = label.symbology == 'code128'
+    final baseBarcodeH = math.min(innerH * 0.42, innerW * 0.45);
+    final baseBarcodeW = label.symbology == 'code128'
         ? innerW * .92
-        : math.min(innerW * .45, barcodeH);
+        : math.min(innerW * .45, baseBarcodeH);
+    final barcodeW = clampLabelCodeDimension(
+      base: baseBarcodeW,
+      scale: codeWidthScale,
+      maximum: innerW,
+    );
+    final barcodeH = clampLabelCodeDimension(
+      base: baseBarcodeH,
+      scale: codeHeightScale,
+      maximum: innerH,
+    );
     final singleTextW = math.max(innerW * .50, innerW * .78);
     final singleFontPeak = [
       fCompany,
@@ -412,12 +453,11 @@ class BrowserPdfGenerator {
               if (visible(LabelFieldKey.barcode))
                 positionedElement(
                   element: LabelLayoutElement.dualLeftCode,
-                  width: twinSide,
-                  height: twinSide,
-                  child: _buildSquareCode(
+                  width: twinCodeW,
+                  height: twinCodeH,
+                  child: _buildCode(
                     symbology: label.symbology,
                     data: values.content,
-                    side: twinSide,
                   ),
                 ),
               if (visible(LabelFieldKey.companyName))
@@ -588,12 +628,11 @@ class BrowserPdfGenerator {
               if (visible(LabelFieldKey.barcode))
                 positionedElement(
                   element: LabelLayoutElement.dualRightCode,
-                  width: twinSide,
-                  height: twinSide,
-                  child: _buildSquareCode(
+                  width: twinCodeW,
+                  height: twinCodeH,
+                  child: _buildCode(
                     symbology: label.symbology,
                     data: values.content,
-                    side: twinSide,
                   ),
                 ),
             ] else ...[
@@ -821,19 +860,12 @@ class BrowserPdfGenerator {
     _ => Barcode.code128(),
   };
 
-  pw.Widget _buildSquareCode({
-    required String symbology,
-    required String data,
-    required double side,
-  }) => pw.SizedBox(
-    width: side,
-    height: side,
-    child: pw.BarcodeWidget(
-      barcode: _barcodeFor(symbology == 'code128' ? 'qr' : symbology),
-      data: data,
-      drawText: false,
-    ),
-  );
+  pw.Widget _buildCode({required String symbology, required String data}) =>
+      pw.BarcodeWidget(
+        barcode: _barcodeFor(symbology == 'code128' ? 'qr' : symbology),
+        data: data,
+        drawText: false,
+      );
 }
 
 abstract interface class BrowserPrintGateway {

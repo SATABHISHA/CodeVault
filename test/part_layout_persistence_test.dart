@@ -57,9 +57,7 @@ void main() {
     expect(payload, isNot(contains('label_layout_config')));
     expect(payload['label_layout'], isA<Map<String, dynamic>>());
     final restored = labelLayoutFromDynamic(payload['label_layout']);
-    final position = restored.positionFor(
-      LabelLayoutElement.dualCompanyName,
-    );
+    final position = restored.positionFor(LabelLayoutElement.dualCompanyName);
     expect(position.x, 0.48);
     expect(position.rotation, 0.3);
   });
@@ -114,6 +112,7 @@ void main() {
     await LocalPartRepository(source).create('tenant-1', {
       'part_number': 'P-200',
       'item_name': 'Seal',
+      'label_profile': {'width_mm': 80.0, 'height_mm': 16.0},
       'label_layout': {
         'singlePartNumber': {'x': 0.63, 'y': 0.19, 'rotation': 0.5},
       },
@@ -142,6 +141,8 @@ void main() {
     );
     expect(position.x, 0.63);
     expect(position.rotation, 0.5);
+    expect(restored.labelWidthMm, 80);
+    expect(restored.labelHeightMm, 16);
   });
 
   test(
@@ -164,6 +165,9 @@ void main() {
                 'label_layout': {
                   'singleItemName': {'x': 0.71, 'y': 0.34, 'rotation': 0.9},
                 },
+                'label_profile': {'width_mm': 80.0, 'height_mm': 16.0},
+                'code_width_scale': 1.35,
+                'code_height_scale': 0.75,
               }),
               serverVersion: 2,
               updatedAt: updatedAt,
@@ -179,12 +183,11 @@ void main() {
                 'part_number': 'P-301',
                 'item_name': 'Imported second part',
                 'label_layout': {
-                  'singleItemName': {
-                    'x': 0.82,
-                    'y': 0.44,
-                    'rotation': 1.2,
-                  },
+                  'singleItemName': {'x': 0.82, 'y': 0.44, 'rotation': 1.2},
                 },
+                'label_profile': {'width_mm': 60.0, 'height_mm': 150.0},
+                'code_width_scale': 1.8,
+                'code_height_scale': 1.7,
               }),
               serverVersion: 2,
               updatedAt: updatedAt,
@@ -215,12 +218,11 @@ void main() {
                 'part_number': 'P-301',
                 'item_name': 'Keep second target',
                 'label_layout': {
-                  'singleItemName': {
-                    'x': 0.22,
-                    'y': 0.24,
-                    'rotation': 0.1,
-                  },
+                  'singleItemName': {'x': 0.22, 'y': 0.24, 'rotation': 0.1},
                 },
+                'label_profile': {'width_mm': 38.0, 'height_mm': 25.0},
+                'code_width_scale': 0.8,
+                'code_height_scale': 0.9,
               }),
               serverVersion: 4,
               updatedAt: updatedAt,
@@ -237,21 +239,22 @@ void main() {
         serverGeneration: 4,
       );
 
-      final row = await (target.select(target.cachedParts)..where(
-            (candidate) => candidate.id.equals('part-1'),
-          ))
-          .getSingle();
+      final row = await (target.select(
+        target.cachedParts,
+      )..where((candidate) => candidate.id.equals('part-1'))).getSingle();
       final payload = jsonDecode(row.payloadJson) as Map<String, dynamic>;
       expect(payload['item_name'], 'Keep target name');
       final restored = labelLayoutFromDynamic(payload['label_layout']);
       final position = restored.positionFor(LabelLayoutElement.singleItemName);
       expect(position.x, 0.71);
       expect(position.rotation, 0.9);
+      expect(payload['label_profile'], {'width_mm': 80.0, 'height_mm': 16.0});
+      expect(payload['code_width_scale'], 1.35);
+      expect(payload['code_height_scale'], 0.75);
 
-      final secondRow = await (target.select(target.cachedParts)..where(
-            (candidate) => candidate.id.equals('part-2'),
-          ))
-          .getSingle();
+      final secondRow = await (target.select(
+        target.cachedParts,
+      )..where((candidate) => candidate.id.equals('part-2'))).getSingle();
       final secondPayload =
           jsonDecode(secondRow.payloadJson) as Map<String, dynamic>;
       expect(secondPayload['item_name'], 'Keep second target');
@@ -261,6 +264,12 @@ void main() {
       );
       expect(preservedPosition.x, 0.22);
       expect(preservedPosition.rotation, 0.1);
+      expect(secondPayload['label_profile'], {
+        'width_mm': 38.0,
+        'height_mm': 25.0,
+      });
+      expect(secondPayload['code_width_scale'], 0.8);
+      expect(secondPayload['code_height_scale'], 0.9);
     },
   );
 }

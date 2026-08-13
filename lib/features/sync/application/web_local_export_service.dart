@@ -225,12 +225,25 @@ class WebLocalExportService {
           final importedLayout =
               importedPayload['label_layout'] ??
               importedPayload['label_layout_config'];
-          // Merge imports normally preserve the target record. Backfill only
-          // the newly introduced per-part layout when the target is a legacy
-          // cached part, so importing a backup does not overwrite newer part
-          // details or an already customized target layout.
+          // Merge imports preserve target records. Backfill newly introduced
+          // per-part label preferences only when the target is a legacy cache,
+          // so newer local customizations are never overwritten.
+          var preferencesChanged = false;
           if (!existingHasLayout && importedLayout != null) {
             existingPayload['label_layout'] = importedLayout;
+            preferencesChanged = true;
+          }
+          for (final key in const [
+            'label_profile',
+            'code_width_scale',
+            'code_height_scale',
+          ]) {
+            if (existingPayload[key] == null && importedPayload[key] != null) {
+              existingPayload[key] = importedPayload[key];
+              preferencesChanged = true;
+            }
+          }
+          if (preferencesChanged) {
             await (database.update(database.cachedParts)..where(
                   (row) =>
                       row.tenantId.equals(tenantId) &

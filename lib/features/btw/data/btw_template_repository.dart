@@ -160,6 +160,9 @@ class BtwTemplateRepository implements PartRepository {
         'scan_value_source':
             data['scan_value_source'] as String? ?? 'encoded_text',
         'label_layout': data['label_layout'],
+        'label_profile': data['label_profile'],
+        'code_width_scale': data['code_width_scale'],
+        'code_height_scale': data['code_height_scale'],
       });
 
   PartRecord _decode(String encoded) =>
@@ -182,6 +185,12 @@ class BtwTemplateRepository implements PartRepository {
     'dynamic_label_fields': DynamicLabelField.listToJson(record.dynamicFields),
     'scan_value_source': record.scanValueSource,
     'label_layout': labelLayoutToJson(record.labelLayout),
+    'label_profile': labelProfileToJson((
+      widthMm: record.labelWidthMm,
+      heightMm: record.labelHeightMm,
+    )),
+    'code_width_scale': record.codeWidthScale,
+    'code_height_scale': record.codeHeightScale,
   };
 
   Future<List<Map<String, dynamic>>> exportRecords(String tenantId) async => [
