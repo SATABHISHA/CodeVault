@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../windows_desktop/application/windows_session.dart';
+import '../../../shared/widgets/ahanova_signature.dart';
 
 class AppShell extends ConsumerWidget {
   const AppShell({required this.child, this.locationOverride, super.key});
@@ -107,7 +108,15 @@ class AppShell extends ConsumerWidget {
             _logoutButton(context, ref),
           ],
         ),
-        body: content,
+        body: Column(
+          children: [
+            Expanded(child: content),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(10, 4, 10, 6),
+              child: AhanovaSignature(compact: true),
+            ),
+          ],
+        ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: compactSelected,
           onDestinationSelected: (index) =>
@@ -144,11 +153,7 @@ class AppShell extends ConsumerWidget {
                       alignment: Alignment.bottomCenter,
                       child: Padding(
                         padding: EdgeInsets.all(16),
-                        child: Text(
-                          BrandConfig.poweredBy,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 11),
-                        ),
+                        child: AhanovaSignature(compact: true),
                       ),
                     ),
                   )

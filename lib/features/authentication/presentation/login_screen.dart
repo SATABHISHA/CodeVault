@@ -7,6 +7,7 @@ import 'package:codevault/features/windows_desktop/application/windows_session.d
 import 'package:codevault/platform/windows/data/bootstrap_store.dart';
 import 'package:codevault/shared/widgets/animated_login_background.dart';
 import 'package:codevault/shared/widgets/app_text_field.dart';
+import 'package:codevault/shared/widgets/ahanova_signature.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -161,14 +162,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                               const SizedBox(height: 8),
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
                                       Checkbox(
                                         value: rememberMe,
                                         onChanged: (val) => setState(
-                                            () => rememberMe = val ?? false),
+                                          () => rememberMe = val ?? false,
+                                        ),
                                       ),
                                       const Text('Remember me'),
                                     ],
@@ -197,11 +200,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ),
                               ),
                               const SizedBox(height: 18),
-                              const Text(
-                                BrandConfig.poweredBy,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 11),
-                              ),
+                              const AhanovaSignature(),
                             ],
                           ),
                         ),
@@ -295,15 +294,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         String message;
         if (exception is DioException) {
           if (exception.response == null) {
-            message = 'We could not reach CodeVault. Check your connection and try again.';
+            message =
+                'We could not reach CodeVault. Check your connection and try again.';
           } else if (exception.response?.statusCode == 429) {
-            message = 'Too many attempts. Please wait a moment before trying again.';
+            message =
+                'Too many attempts. Please wait a moment before trying again.';
           } else if (exception.response?.statusCode == 422) {
-            message = 'The username or password is incorrect. Please check your details.';
+            message =
+                'The username or password is incorrect. Please check your details.';
           } else if (exception.response?.statusCode == 403) {
             message = 'Your account or tenant is currently unavailable.';
           } else {
-            message = 'An unexpected server error occurred (${exception.response?.statusCode}). Please try again later.';
+            message =
+                'An unexpected server error occurred (${exception.response?.statusCode}). Please try again later.';
           }
         } else {
           message = 'An unexpected error occurred. Please try again.';
@@ -320,7 +323,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _persistCompanyId(String companyId) async {
     try {
       await createBootstrapStore().writeCompanyId(companyId);
-    } catch (_) { /* bootstrap store failure is non-fatal */ }
+    } catch (_) {
+      /* bootstrap store failure is non-fatal */
+    }
   }
 
   Future<void> _showLoginFailure(String message) => showGeneralDialog<void>(

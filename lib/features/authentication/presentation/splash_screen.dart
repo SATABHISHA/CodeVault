@@ -2,6 +2,7 @@ import 'package:codevault/core/config/brand_config.dart';
 import 'package:codevault/core/platform/platform_capabilities.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:codevault/shared/widgets/ahanova_signature.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -40,7 +41,7 @@ class _SplashScreenState extends State<SplashScreen> {
               style: TextStyle(fontSize: 32, fontWeight: FontWeight.w700),
             ),
             SizedBox(height: 8),
-            Text(BrandConfig.poweredBy),
+            AhanovaSignature(),
           ],
         ),
       ),
