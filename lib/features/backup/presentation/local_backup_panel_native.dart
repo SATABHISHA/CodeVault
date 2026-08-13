@@ -117,10 +117,9 @@ class _LocalBackupPanelState extends State<LocalBackupPanel> {
     await _run(() async {
       final value = await _database();
       final manifest = await service.verify(File(source.path));
-      if (manifest.companyId != value.$1) {
-        throw StateError('This backup belongs to another company.');
-      }
-      if (manifest.ownerUserId != null &&
+      final foreignCompany = manifest.companyId != value.$1;
+      if (!foreignCompany &&
+          manifest.ownerUserId != null &&
           manifest.ownerUserId != widget.userId) {
         throw StateError(
           'This backup belongs to another signed-in user account.',
@@ -132,19 +131,27 @@ class _LocalBackupPanelState extends State<LocalBackupPanel> {
           final report = await service.merge(
             source: File(source.path),
             target: database,
+            targetCompanyId: value.$1,
           );
           notifyBackupImported();
-          return 'Merge complete: ${report.values.fold<int>(0, (a, b) => a + b)} new records; existing records kept.';
+          return 'Merge complete: ${report.values.fold<int>(0, (a, b) => a + b)} new records; existing records kept${foreignCompany ? ' and imported company data was assigned to this company' : ''}.';
         } finally {
           await database.close();
         }
       }
-      final safety = await service.replace(
-        source: File(source.path),
-        currentDatabase: value.$2,
-      );
-      notifyBackupImported();
-      return 'Database replaced. Safety copy: ${safety.path}';
+      final database = LocalDatabase(value.$1);
+      try {
+        final result = await service.replaceCompanyData(
+          source: File(source.path),
+          currentDatabase: value.$2,
+          target: database,
+          targetCompanyId: value.$1,
+        );
+        notifyBackupImported();
+        return 'Company data replaced safely. Local login and company identity were kept. Safety copy: ${result.$1.path}';
+      } finally {
+        await database.close();
+      }
     });
   }
 
@@ -155,7 +162,7 @@ class _LocalBackupPanelState extends State<LocalBackupPanel> {
           builder: (context) => AlertDialog(
             title: const Text('Replace local database?'),
             content: const Text(
-              'The current database will be preserved as a safety copy before replacement. Continue?',
+              'The active company’s parts, layouts, printers, and settings will be replaced. Local users, login credentials, and company identity will be kept, and a safety copy will be created. Continue?',
             ),
             actions: [
               TextButton(

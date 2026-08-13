@@ -116,8 +116,11 @@ class LocalBackupService {
   Future<Map<String, int>> merge({
     required File source,
     required LocalDatabase target,
+    String? targetCompanyId,
+    bool replaceExisting = false,
   }) async {
-    await verify(source);
+    final manifest = await verify(source);
+    final destinationCompanyId = targetCompanyId ?? manifest.companyId;
     final archive = ZipDecoder().decodeBytes(await source.readAsBytes());
     final bytes =
         archive.findFile('database/codevault.sqlite')!.content as List<int>;
@@ -141,6 +144,14 @@ class LocalBackupService {
     try {
       await target.customStatement("ATTACH DATABASE '$escaped' AS imported");
       await target.transaction(() async {
+        if (replaceExisting) {
+          for (final table in tables.reversed) {
+            await target.customStatement(
+              'DELETE FROM $table WHERE company_id = ?',
+              [destinationCompanyId],
+            );
+          }
+        }
         for (final table in tables) {
           final before = await _count(target, table);
           final targetColumns = await _columns(target, table);
@@ -156,9 +167,17 @@ class LocalBackupService {
           final columns = sharedColumns
               .map((column) => '"${column.replaceAll('"', '""')}"')
               .join(', ');
+          final values = sharedColumns
+              .map(
+                (column) => column == 'company_id'
+                    ? '?'
+                    : '"${column.replaceAll('"', '""')}"',
+              )
+              .join(', ');
           await target.customStatement(
             'INSERT OR IGNORE INTO $table ($columns) '
-            'SELECT $columns FROM imported.$table',
+            'SELECT $values FROM imported.$table WHERE company_id = ?',
+            [destinationCompanyId, manifest.companyId],
           );
           report[table] = await _count(target, table) - before;
         }
@@ -173,6 +192,28 @@ class LocalBackupService {
     } finally {
       if (await temporary.exists()) await temporary.delete();
     }
+  }
+
+  /// Replaces only the active company's operational data. Company identity,
+  /// local users, roles, credentials, and audit/security records are retained.
+  Future<(File, Map<String, int>)> replaceCompanyData({
+    required File source,
+    required File currentDatabase,
+    required LocalDatabase target,
+    required String targetCompanyId,
+  }) async {
+    final safety = File(
+      '${currentDatabase.path}.pre-replace-${const Uuid().v4()}.bak',
+    );
+    final escapedSafetyPath = safety.path.replaceAll("'", "''");
+    await target.customStatement("VACUUM INTO '$escapedSafetyPath'");
+    final report = await merge(
+      source: source,
+      target: target,
+      targetCompanyId: targetCompanyId,
+      replaceExisting: true,
+    );
+    return (safety, report);
   }
 
   Future<int> _count(LocalDatabase database, String table) async {

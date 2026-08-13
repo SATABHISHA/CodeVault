@@ -206,7 +206,8 @@ void main() {
         'codevault-merge-test-',
       );
       addTearDown(() => directory.delete(recursive: true));
-      final companyId = const Uuid().v4();
+      final sourceCompanyId = const Uuid().v4();
+      final targetCompanyId = const Uuid().v4();
       final sourceFile = File(
         '${directory.path}${Platform.pathSeparator}source.sqlite',
       );
@@ -214,7 +215,7 @@ void main() {
         NativeDatabase(sourceFile),
       );
       await LocalAccountService(sourceDatabase).initializeCompany(
-        companyId: companyId,
+        companyId: sourceCompanyId,
         name: 'Merge Source',
         username: 'source-admin',
         displayName: 'Source Admin',
@@ -225,7 +226,7 @@ void main() {
           .insert(
             PartsCompanion.insert(
               id: const Uuid().v4(),
-              companyId: companyId,
+              companyId: sourceCompanyId,
               item: 'Imported Part',
             ),
           );
@@ -235,22 +236,105 @@ void main() {
       );
       const service = LocalBackupService();
       await service.create(
-        companyId: companyId,
+        companyId: sourceCompanyId,
         database: sourceFile,
         destination: backup,
       );
       await LocalAccountService(database).initializeCompany(
-        companyId: companyId,
+        companyId: targetCompanyId,
         name: 'Merge Target',
         username: 'target-admin',
         displayName: 'Target Admin',
         password: 'CorrectHorseBattery!1',
       );
-      final report = await service.merge(source: backup, target: database);
+      final report = await service.merge(
+        source: backup,
+        target: database,
+        targetCompanyId: targetCompanyId,
+      );
       expect(report['parts'], 1);
+      final importedPart = await database.select(database.parts).getSingle();
+      expect(importedPart.item, 'Imported Part');
+      expect(importedPart.companyId, targetCompanyId);
       expect(
-        (await database.select(database.parts).getSingle()).item,
-        'Imported Part',
+        (await database.select(database.companies).getSingle()).id,
+        targetCompanyId,
+      );
+    },
+  );
+
+  test(
+    'foreign-company replace keeps target identity and local users',
+    () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'codevault-foreign-replace-test-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final sourceCompanyId = const Uuid().v4();
+      final targetCompanyId = await _initialize(accounts);
+      await database
+          .into(database.parts)
+          .insert(
+            PartsCompanion.insert(
+              id: 'old-part',
+              companyId: targetCompanyId,
+              item: 'Old Part',
+            ),
+          );
+
+      final sourceFile = File(
+        '${directory.path}${Platform.pathSeparator}foreign.sqlite',
+      );
+      final sourceDatabase = LocalDatabase.forTesting(
+        NativeDatabase(sourceFile),
+      );
+      await LocalAccountService(sourceDatabase).initializeCompany(
+        companyId: sourceCompanyId,
+        name: 'Foreign Company',
+        username: 'foreign-admin',
+        displayName: 'Foreign Admin',
+        password: 'CorrectHorseBattery!1',
+      );
+      await sourceDatabase
+          .into(sourceDatabase.parts)
+          .insert(
+            PartsCompanion.insert(
+              id: 'foreign-part',
+              companyId: sourceCompanyId,
+              item: 'Transferred Part',
+            ),
+          );
+      await sourceDatabase.close();
+
+      final backup = File(
+        '${directory.path}${Platform.pathSeparator}foreign.cvbackup',
+      );
+      const service = LocalBackupService();
+      await service.create(
+        companyId: sourceCompanyId,
+        database: sourceFile,
+        destination: backup,
+      );
+      final result = await service.replaceCompanyData(
+        source: backup,
+        currentDatabase: File(
+          '${directory.path}${Platform.pathSeparator}target.sqlite',
+        ),
+        target: database,
+        targetCompanyId: targetCompanyId,
+      );
+
+      expect(await result.$1.exists(), isTrue);
+      final part = await database.select(database.parts).getSingle();
+      expect(part.item, 'Transferred Part');
+      expect(part.companyId, targetCompanyId);
+      expect(
+        (await database.select(database.companies).getSingle()).id,
+        targetCompanyId,
+      );
+      expect(
+        (await database.select(database.localUsers).getSingle()).username,
+        'owner',
       );
     },
   );

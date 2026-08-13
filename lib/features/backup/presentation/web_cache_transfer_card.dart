@@ -37,7 +37,7 @@ class _WebCacheTransferCardState extends State<WebCacheTransferCard> {
           ),
           const SizedBox(height: 6),
           const Text(
-            'Download this account-scoped company backup, merge missing records without overwriting, or replace this company’s local cache. Files from another company or another signed-in user are rejected.',
+            'Download this company backup, merge missing records without overwriting, or replace this company’s local cache. Backups from another company or user are safely reassigned to the signed-in company during import.',
           ),
           const SizedBox(height: 12),
           Wrap(

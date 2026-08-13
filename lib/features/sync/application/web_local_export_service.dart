@@ -152,19 +152,23 @@ class WebLocalExportService {
     final manifest =
         jsonDecode(utf8.decode(manifestFile.content as List<int>))
             as Map<String, dynamic>;
-    if (manifest['format'] != 'codevault-web-cache' ||
-        manifest['tenant_id'] != tenantId) {
-      throw const FormatException(
-        'Export belongs to another tenant or format.',
-      );
+    if (manifest['format'] != 'codevault-web-cache') {
+      throw const FormatException('Unsupported browser export format.');
     }
-    final ownerUserId = manifest['owner_user_id'] as String?;
-    if (ownerUserId != null && ownerUserId != currentUserId) {
+    final sourceTenantId = manifest['tenant_id'] as String?;
+    if (sourceTenantId == null || sourceTenantId.isEmpty) {
+      throw const FormatException('Export company identity is missing.');
+    }
+    final sameTenant = sourceTenantId == tenantId;
+    final sourceOwnerUserId = manifest['owner_user_id'] as String?;
+    if (sameTenant &&
+        sourceOwnerUserId != null &&
+        sourceOwnerUserId != currentUserId) {
       throw StateError(
         'This backup belongs to another signed-in user account.',
       );
     }
-    if ((manifest['generation'] as int) < serverGeneration) {
+    if (sameTenant && (manifest['generation'] as int) < serverGeneration) {
       throw StateError(
         'Browser export is stale; align with Laravel before import.',
       );
@@ -208,7 +212,9 @@ class WebLocalExportService {
                 CachedPartsCompanion.insert(
                   id: raw['id'] as String,
                   tenantId: tenantId,
-                  payloadJson: jsonEncode(raw['payload']),
+                  payloadJson: jsonEncode(
+                    _retargetCompanyData(raw['payload'], tenantId),
+                  ),
                   serverVersion: (raw['version'] as num).toInt(),
                   deleted: Value(raw['deleted'] as bool),
                   updatedAt: DateTime.parse(raw['updated_at'] as String),
@@ -217,7 +223,9 @@ class WebLocalExportService {
         } else {
           final existingPayload =
               jsonDecode(existing.payloadJson) as Map<String, dynamic>;
-          final importedPayload = raw['payload'] as Map<String, dynamic>;
+          final importedPayload =
+              _retargetCompanyData(raw['payload'], tenantId)
+                  as Map<String, dynamic>;
           final existingLayout =
               existingPayload['label_layout'] ??
               existingPayload['label_layout_config'];
@@ -272,7 +280,9 @@ class WebLocalExportService {
                 LocalLabelPreviewsCompanion.insert(
                   id: raw['id'] as String,
                   tenantId: tenantId,
-                  definitionJson: jsonEncode(raw['definition']),
+                  definitionJson: jsonEncode(
+                    _retargetCompanyData(raw['definition'], tenantId),
+                  ),
                   updatedAt: Value(DateTime.parse(raw['updated_at'] as String)),
                 ),
               );
@@ -287,7 +297,9 @@ class WebLocalExportService {
                 tenantId: tenantId,
                 entityType: raw['entity_type'] as String,
                 entityId: raw['entity_id'] as String,
-                localPayloadJson: jsonEncode(raw['payload']),
+                localPayloadJson: jsonEncode(
+                  _retargetCompanyData(raw['payload'], tenantId),
+                ),
                 serverPayloadJson: '{}',
                 reason: 'imported_browser_draft_requires_review',
               ),
@@ -298,5 +310,21 @@ class WebLocalExportService {
       cachedParts: parts.length,
       pendingDrafts: drafts.length,
     );
+  }
+
+  dynamic _retargetCompanyData(dynamic value, String tenantId) {
+    if (value is List) {
+      return value.map((item) => _retargetCompanyData(item, tenantId)).toList();
+    }
+    if (value is Map) {
+      return <String, dynamic>{
+        for (final entry in value.entries)
+          entry.key
+              .toString(): entry.key == 'tenant_id' || entry.key == 'company_id'
+              ? tenantId
+              : _retargetCompanyData(entry.value, tenantId),
+      };
+    }
+    return value;
   }
 }

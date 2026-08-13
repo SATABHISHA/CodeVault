@@ -17,7 +17,7 @@ void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
 
   test(
-    'web export validates tenant and user and converts pending drafts to review conflicts',
+    'web export safely retargets another company and converts drafts to review conflicts',
     () async {
       final source = AndroidCacheDatabase.forTesting(NativeDatabase.memory());
       final target = AndroidCacheDatabase.forTesting(NativeDatabase.memory());
@@ -29,7 +29,11 @@ void main() {
             CachedPartsCompanion.insert(
               id: 'part-1',
               tenantId: 'tenant-a',
-              payloadJson: jsonEncode({'name': 'Cached'}),
+              payloadJson: jsonEncode({
+                'name': 'Cached',
+                'tenant_id': 'tenant-a',
+                'company_id': 'tenant-a',
+              }),
               serverVersion: 2,
               updatedAt: DateTime.utc(2026),
             ),
@@ -51,20 +55,7 @@ void main() {
         source,
       ).export('tenant-a', 4, ownerUserId: 'user-a');
       await expectLater(
-        WebLocalExportService(
-          target,
-        ).import(
-          bytes,
-          tenantId: 'tenant-b',
-          currentUserId: 'user-a',
-          serverGeneration: 4,
-        ),
-        throwsFormatException,
-      );
-      await expectLater(
-        WebLocalExportService(
-          target,
-        ).import(
+        WebLocalExportService(target).import(
           bytes,
           tenantId: 'tenant-a',
           currentUserId: 'user-b',
@@ -72,15 +63,23 @@ void main() {
         ),
         throwsStateError,
       );
-      final report = await WebLocalExportService(
-        target,
-      ).import(
+      final report = await WebLocalExportService(target).import(
         bytes,
-        tenantId: 'tenant-a',
-        currentUserId: 'user-a',
-        serverGeneration: 4,
+        tenantId: 'tenant-b',
+        currentUserId: 'user-b',
+        serverGeneration: 99,
       );
       expect(report.cachedParts, 1);
+      final imported = await target.select(target.cachedParts).getSingle();
+      expect(imported.tenantId, 'tenant-b');
+      expect(
+        jsonDecode(imported.payloadJson),
+        containsPair('tenant_id', 'tenant-b'),
+      );
+      expect(
+        jsonDecode(imported.payloadJson),
+        containsPair('company_id', 'tenant-b'),
+      );
       expect(
         (await target.select(target.syncConflicts).getSingle()).reason,
         'imported_browser_draft_requires_review',
