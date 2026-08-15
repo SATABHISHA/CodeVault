@@ -19,6 +19,7 @@ class LocalPartRepository implements PartRepository {
   static const _labelLayoutPrefix = 'part-label-layout:';
   static const _labelProfilePrefix = 'part-label-profile:';
   static const _codeSizePrefix = 'part-code-size:';
+  static const _printPreferencesPrefix = 'part-print-preferences:';
 
   // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -28,6 +29,8 @@ class LocalPartRepository implements PartRepository {
   String _labelLayoutKey(String partId) => '$_labelLayoutPrefix$partId';
   String _labelProfileKey(String partId) => '$_labelProfilePrefix$partId';
   String _codeSizeKey(String partId) => '$_codeSizePrefix$partId';
+  String _printPreferencesKey(String partId) =>
+      '$_printPreferencesPrefix$partId';
 
   PartRecord _fromRow(
     Part row, {
@@ -37,9 +40,19 @@ class LocalPartRepository implements PartRepository {
     String? labelLayoutJson,
     String? labelProfileJson,
     String? codeSizeJson,
+    String? printPreferencesJson,
   }) {
     final labelProfile = labelProfileFromDynamic(labelProfileJson);
     final codeSize = labelCodeScalesFromDynamic(codeSizeJson);
+    Map<String, dynamic> printPreferences = const {};
+    try {
+      if (printPreferencesJson != null) {
+        printPreferences =
+            jsonDecode(printPreferencesJson) as Map<String, dynamic>;
+      }
+    } catch (_) {
+      // Legacy/corrupt optional preferences use backward-compatible defaults.
+    }
     return PartRecord(
       id: row.id,
       number: row.description ?? row.id, // description stores the part number
@@ -59,6 +72,10 @@ class LocalPartRepository implements PartRepository {
       labelHeightMm: labelProfile.heightMm,
       codeWidthScale: codeSize.widthScale,
       codeHeightScale: codeSize.heightScale,
+      stickersPerRow: normalizeStickersPerRow(
+        printPreferences['stickers_per_row'],
+      ),
+      includeBorder: normalizeIncludeBorder(printPreferences['include_border']),
     );
   }
 
@@ -186,6 +203,24 @@ class LocalPartRepository implements PartRepository {
         ),
       );
 
+  Future<void> _savePrintPreferences(
+    String tenantId,
+    String partId, {
+    required Object? stickersPerRow,
+    required Object? includeBorder,
+  }) => _db
+      .into(_db.localSettings)
+      .insertOnConflictUpdate(
+        LocalSettingsCompanion.insert(
+          companyId: tenantId,
+          key: _printPreferencesKey(partId),
+          value: jsonEncode({
+            'stickers_per_row': normalizeStickersPerRow(stickersPerRow),
+            'include_border': normalizeIncludeBorder(includeBorder),
+          }),
+        ),
+      );
+
   // ── interface ─────────────────────────────────────────────────────────────
 
   @override
@@ -229,6 +264,11 @@ class LocalPartRepository implements PartRepository {
       ids,
       _codeSizePrefix,
     );
+    final printPreferences = await _loadSettingsByPartIds(
+      tenantId,
+      ids,
+      _printPreferencesPrefix,
+    );
     return rows
         .map(
           (row) => _fromRow(
@@ -239,6 +279,7 @@ class LocalPartRepository implements PartRepository {
             labelLayoutJson: labelLayouts[row.id],
             labelProfileJson: labelProfiles[row.id],
             codeSizeJson: codeSizes[row.id],
+            printPreferencesJson: printPreferences[row.id],
           ),
         )
         .toList();
@@ -284,6 +325,12 @@ class LocalPartRepository implements PartRepository {
       widthScale: data['code_width_scale'],
       heightScale: data['code_height_scale'],
     );
+    await _savePrintPreferences(
+      tenantId,
+      id,
+      stickersPerRow: data['stickers_per_row'],
+      includeBorder: data['include_border'],
+    );
     final row = await (_db.select(
       _db.parts,
     )..where((t) => t.id.equals(id))).getSingle();
@@ -327,6 +374,13 @@ class LocalPartRepository implements PartRepository {
                   t.companyId.equals(tenantId) & t.key.equals(_codeSizeKey(id)),
             ))
             .getSingleOrNull();
+    final printPreferences =
+        await (_db.select(_db.localSettings)..where(
+              (t) =>
+                  t.companyId.equals(tenantId) &
+                  t.key.equals(_printPreferencesKey(id)),
+            ))
+            .getSingleOrNull();
     return _fromRow(
       row,
       configJson: config?.value,
@@ -335,6 +389,7 @@ class LocalPartRepository implements PartRepository {
       labelLayoutJson: labelLayout?.value,
       labelProfileJson: labelProfile?.value,
       codeSizeJson: codeSize?.value,
+      printPreferencesJson: printPreferences?.value,
     );
   }
 
@@ -393,6 +448,15 @@ class LocalPartRepository implements PartRepository {
         heightScale: data['code_height_scale'] ?? part.codeHeightScale,
       );
     }
+    if (data.containsKey('stickers_per_row') ||
+        data.containsKey('include_border')) {
+      await _savePrintPreferences(
+        tenantId,
+        part.id,
+        stickersPerRow: data['stickers_per_row'] ?? part.stickersPerRow,
+        includeBorder: data['include_border'] ?? part.includeBorder,
+      );
+    }
     final row =
         await (_db.select(_db.parts)..where(
               (t) => t.companyId.equals(tenantId) & t.id.equals(part.id),
@@ -440,6 +504,13 @@ class LocalPartRepository implements PartRepository {
                   t.key.equals(_codeSizeKey(part.id)),
             ))
             .getSingleOrNull();
+    final printPreferences =
+        await (_db.select(_db.localSettings)..where(
+              (t) =>
+                  t.companyId.equals(tenantId) &
+                  t.key.equals(_printPreferencesKey(part.id)),
+            ))
+            .getSingleOrNull();
     return _fromRow(
       row,
       configJson: config?.value,
@@ -448,6 +519,7 @@ class LocalPartRepository implements PartRepository {
       labelLayoutJson: labelLayout?.value,
       labelProfileJson: labelProfile?.value,
       codeSizeJson: codeSize?.value,
+      printPreferencesJson: printPreferences?.value,
     );
   }
 
@@ -462,7 +534,8 @@ class LocalPartRepository implements PartRepository {
                   t.key.equals(_scanValueSourceKey(id)) |
                   t.key.equals(_labelLayoutKey(id)) |
                   t.key.equals(_labelProfileKey(id)) |
-                  t.key.equals(_codeSizeKey(id))),
+                  t.key.equals(_codeSizeKey(id)) |
+                  t.key.equals(_printPreferencesKey(id))),
         ))
         .go();
   }

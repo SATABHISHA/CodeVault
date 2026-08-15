@@ -52,6 +52,8 @@ class WebLocalPartRepository implements PartRepository {
       labelHeightMm: labelProfile.heightMm,
       codeWidthScale: normalizeLabelCodeScale(payload['code_width_scale']),
       codeHeightScale: normalizeLabelCodeScale(payload['code_height_scale']),
+      stickersPerRow: normalizeStickersPerRow(payload['stickers_per_row']),
+      includeBorder: normalizeIncludeBorder(payload['include_border']),
     );
   }
 
@@ -111,6 +113,10 @@ class WebLocalPartRepository implements PartRepository {
       'code_height_scale': normalizeLabelCodeScale(
         normalized['code_height_scale'],
       ),
+      'stickers_per_row': normalizeStickersPerRow(
+        normalized['stickers_per_row'],
+      ),
+      'include_border': normalizeIncludeBorder(normalized['include_border']),
     };
 
     final db = _db(tenantId);
@@ -196,6 +202,12 @@ class WebLocalPartRepository implements PartRepository {
     }
     if (normalized.containsKey('code_height_scale')) {
       payload['code_height_scale'] = normalized['code_height_scale'];
+    }
+    if (normalized.containsKey('stickers_per_row')) {
+      payload['stickers_per_row'] = normalized['stickers_per_row'];
+    }
+    if (normalized.containsKey('include_border')) {
+      payload['include_border'] = normalized['include_border'];
     }
 
     final changed =

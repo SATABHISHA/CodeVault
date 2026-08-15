@@ -245,6 +245,8 @@ class WebLocalExportService {
             'label_profile',
             'code_width_scale',
             'code_height_scale',
+            'stickers_per_row',
+            'include_border',
           ]) {
             if (existingPayload[key] == null && importedPayload[key] != null) {
               existingPayload[key] = importedPayload[key];

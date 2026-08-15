@@ -168,6 +168,8 @@ void main() {
                 'label_profile': {'width_mm': 80.0, 'height_mm': 16.0},
                 'code_width_scale': 1.35,
                 'code_height_scale': 0.75,
+                'stickers_per_row': 5,
+                'include_border': false,
               }),
               serverVersion: 2,
               updatedAt: updatedAt,
@@ -188,6 +190,8 @@ void main() {
                 'label_profile': {'width_mm': 60.0, 'height_mm': 150.0},
                 'code_width_scale': 1.8,
                 'code_height_scale': 1.7,
+                'stickers_per_row': 4,
+                'include_border': false,
               }),
               serverVersion: 2,
               updatedAt: updatedAt,
@@ -223,6 +227,8 @@ void main() {
                 'label_profile': {'width_mm': 38.0, 'height_mm': 25.0},
                 'code_width_scale': 0.8,
                 'code_height_scale': 0.9,
+                'stickers_per_row': 2,
+                'include_border': true,
               }),
               serverVersion: 4,
               updatedAt: updatedAt,
@@ -251,6 +257,8 @@ void main() {
       expect(payload['label_profile'], {'width_mm': 80.0, 'height_mm': 16.0});
       expect(payload['code_width_scale'], 1.35);
       expect(payload['code_height_scale'], 0.75);
+      expect(payload['stickers_per_row'], 5);
+      expect(payload['include_border'], isFalse);
 
       final secondRow = await (target.select(
         target.cachedParts,
@@ -270,6 +278,8 @@ void main() {
       });
       expect(secondPayload['code_width_scale'], 0.8);
       expect(secondPayload['code_height_scale'], 0.9);
+      expect(secondPayload['stickers_per_row'], 2);
+      expect(secondPayload['include_border'], isTrue);
     },
   );
 }

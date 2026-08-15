@@ -2995,6 +2995,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     )),
     'code_width_scale': codeWidthScale,
     'code_height_scale': codeHeightScale,
+    'stickers_per_row': stickersPerRow,
+    'include_border': includeBorder,
     'label_company_name': companyName.text.trim(),
     'label_company_address': companyAddress.text.trim(),
     'label_field_config': LabelFieldConfig.toJsonObject(_labelFieldSettings),
@@ -3064,7 +3066,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       () => (part.labelWidthMm, part.labelHeightMm),
     );
     labelSize = partLabelSize;
-    stickersPerRow = (maxPageWidthMm / part.labelWidthMm).floor().clamp(1, 999);
+    stickersPerRow =
+        part.stickersPerRow ??
+        (maxPageWidthMm / part.labelWidthMm).floor().clamp(1, 999);
+    includeBorder = part.includeBorder;
     _labelFieldSettings = LabelFieldConfig.mergeWithDefaults(
       part.labelFieldSettings,
     );
@@ -3489,6 +3494,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     codeHeightScale = defaultLabelCodeScale;
     labelSize = _labelSizeName(defaultLabelWidthMm, defaultLabelHeightMm);
     stickersPerRow = maxStickersPerRow.clamp(1, 999);
+    includeBorder = true;
     dr.text = 'NR';
     pack.text = '1';
     quantity.text = '1';

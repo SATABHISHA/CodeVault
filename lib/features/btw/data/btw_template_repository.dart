@@ -163,6 +163,8 @@ class BtwTemplateRepository implements PartRepository {
         'label_profile': data['label_profile'],
         'code_width_scale': data['code_width_scale'],
         'code_height_scale': data['code_height_scale'],
+        'stickers_per_row': data['stickers_per_row'],
+        'include_border': data['include_border'],
       });
 
   PartRecord _decode(String encoded) =>
@@ -191,6 +193,8 @@ class BtwTemplateRepository implements PartRepository {
     )),
     'code_width_scale': record.codeWidthScale,
     'code_height_scale': record.codeHeightScale,
+    'stickers_per_row': record.stickersPerRow,
+    'include_border': record.includeBorder,
   };
 
   Future<List<Map<String, dynamic>>> exportRecords(String tenantId) async => [

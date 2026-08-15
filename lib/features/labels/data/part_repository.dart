@@ -13,6 +13,28 @@ const double defaultLabelHeightMm = 30.0;
 const double maxLabelWidthMm = 210.0;
 const double maxLabelHeightMm = 297.0;
 
+int? normalizeStickersPerRow(Object? value) {
+  final parsed = switch (value) {
+    int number => number,
+    num number => number.toInt(),
+    String text => int.tryParse(text.trim()),
+    _ => null,
+  };
+  return parsed != null && parsed >= 1 && parsed <= 999 ? parsed : null;
+}
+
+bool normalizeIncludeBorder(Object? value) => switch (value) {
+  bool enabled => enabled,
+  num number => number != 0,
+  String text => !const {
+    'false',
+    '0',
+    'off',
+    'no',
+  }.contains(text.trim().toLowerCase()),
+  _ => true,
+};
+
 typedef LabelProfileDimensions = ({double widthMm, double heightMm});
 
 double? _validLabelDimension(Object? value, double maximum) {
@@ -132,6 +154,16 @@ Map<String, dynamic> normalizePartMutationPayload(Map<String, dynamic> data) {
       data['code_height_scale'],
     );
   }
+  if (data.containsKey('stickers_per_row')) {
+    normalized['stickers_per_row'] = normalizeStickersPerRow(
+      data['stickers_per_row'],
+    );
+  }
+  if (data.containsKey('include_border')) {
+    normalized['include_border'] = normalizeIncludeBorder(
+      data['include_border'],
+    );
+  }
   if (data.containsKey('label_layout') ||
       data.containsKey('label_layout_config')) {
     final raw = data['label_layout'] ?? data['label_layout_config'];
@@ -161,6 +193,8 @@ class PartRecord {
     double labelHeightMm = defaultLabelHeightMm,
     double codeWidthScale = defaultLabelCodeScale,
     double codeHeightScale = defaultLabelCodeScale,
+    int? stickersPerRow,
+    this.includeBorder = true,
   }) : labelFieldSettings = LabelFieldConfig.mergeWithDefaults(
          labelFieldSettings,
        ),
@@ -173,7 +207,8 @@ class PartRecord {
            _validLabelDimension(labelHeightMm, maxLabelHeightMm) ??
            defaultLabelHeightMm,
        codeWidthScale = normalizeLabelCodeScale(codeWidthScale),
-       codeHeightScale = normalizeLabelCodeScale(codeHeightScale);
+       codeHeightScale = normalizeLabelCodeScale(codeHeightScale),
+       stickersPerRow = normalizeStickersPerRow(stickersPerRow);
 
   factory PartRecord.fromJson(Map<String, dynamic> json) {
     final dynamic configValue =
@@ -212,6 +247,8 @@ class PartRecord {
       labelHeightMm: labelProfile.heightMm,
       codeWidthScale: normalizeLabelCodeScale(json['code_width_scale']),
       codeHeightScale: normalizeLabelCodeScale(json['code_height_scale']),
+      stickersPerRow: normalizeStickersPerRow(json['stickers_per_row']),
+      includeBorder: normalizeIncludeBorder(json['include_border']),
     );
   }
 
@@ -233,6 +270,8 @@ class PartRecord {
   final double labelHeightMm;
   final double codeWidthScale;
   final double codeHeightScale;
+  final int? stickersPerRow;
+  final bool includeBorder;
 }
 
 /// Abstract interface — implemented by [CloudPartRepository] (web/mobile) and
