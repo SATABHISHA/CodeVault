@@ -309,7 +309,7 @@ void main() {
   test('new QR text combines part, DR, model, MMYY and serial', () {
     const document = BrowserLabelDocument(
       title: 'Part',
-      content: 'PN10NRMX0826001',
+      content: '00PN10NRMX0826001',
       widthMm: 100,
       heightMm: 30,
       partNumber: 'PN10',
@@ -322,8 +322,8 @@ void main() {
       serialNumberIncrement: 2,
     );
 
-    expect(document.stickerValuesAt(0).content, 'PN10NRMX0826001');
-    expect(document.stickerValuesAt(2).content, 'PN10NRMX0826005');
+    expect(document.stickerValuesAt(0).content, '00PN10NRMX0826001');
+    expect(document.stickerValuesAt(2).content, '00PN10NRMX0826005');
   });
 
   test('selected part or serial scan source changes on every label', () {

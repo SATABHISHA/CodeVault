@@ -143,7 +143,7 @@ class BrowserLabelDocument {
         '00$resolvedPartNumber${encodedDrCode}E$encodedYearMonth${resolvedSerialNumber.padLeft(7, '0')}',
       'new_encoded_qrcode_text'
           when encodedYearMonth != null && (partChanged || serialChanged) =>
-        '$resolvedPartNumber$encodedDrCode$encodedItemModel${encodedYearMonth!.substring(2)}${encodedYearMonth!.substring(0, 2)}$resolvedSerialNumber',
+        '00$resolvedPartNumber$encodedDrCode$encodedItemModel${encodedYearMonth!.substring(2)}${encodedYearMonth!.substring(0, 2)}$resolvedSerialNumber',
       _ => content,
     };
     return (

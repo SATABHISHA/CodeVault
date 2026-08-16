@@ -443,7 +443,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     final now = DateTime.now();
     final month = now.month.toString().padLeft(2, '0');
     final year = (now.year % 100).toString().padLeft(2, '0');
-    return '${partNumber.text}${dr.text}${model.text}$month$year${serial.text}';
+    return '00${partNumber.text}${dr.text}${model.text}$month$year${serial.text}';
   }
 
   Map<String, String> get _scanValueOptions => {
