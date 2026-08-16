@@ -17,9 +17,19 @@ void main() {
       'item_name': 'Configured',
       'stickers_per_row': 5,
       'include_border': false,
+      'serial_number': '0098',
+      'auto_increment_serial_number': true,
+      'serial_number_increment': 2,
+      'dual_side_codes': false,
+      'auto_date_time': false,
     });
     expect(configured.stickersPerRow, 5);
     expect(configured.includeBorder, isFalse);
+    expect(configured.serialNumber, '0098');
+    expect(configured.autoIncrementSerialNumber, isTrue);
+    expect(configured.serialNumberIncrement, 2);
+    expect(configured.dualSideCodes, isFalse);
+    expect(configured.autoDateTime, isFalse);
 
     final legacy = PartRecord.fromJson({
       'id': 'part-2',
@@ -28,6 +38,10 @@ void main() {
     });
     expect(legacy.stickersPerRow, null);
     expect(legacy.includeBorder, isTrue);
+    expect(legacy.serialNumber, '001');
+    expect(legacy.autoIncrementSerialNumber, isFalse);
+    expect(legacy.dualSideCodes, isTrue);
+    expect(legacy.autoDateTime, isTrue);
   });
 
   test('mutation payload validates print preferences', () {
@@ -51,9 +65,19 @@ void main() {
       'item_name': 'Bearing',
       'stickers_per_row': 5,
       'include_border': false,
+      'serial_number': '0017',
+      'auto_increment_serial_number': true,
+      'serial_number_increment': 3,
+      'dual_side_codes': false,
+      'auto_date_time': false,
     });
     expect(created.stickersPerRow, 5);
     expect(created.includeBorder, isFalse);
+    expect(created.serialNumber, '0017');
+    expect(created.autoIncrementSerialNumber, isTrue);
+    expect(created.serialNumberIncrement, 3);
+    expect(created.dualSideCodes, isFalse);
+    expect(created.autoDateTime, isFalse);
 
     final setting =
         await (database.select(database.localSettings)..where(
@@ -63,14 +87,29 @@ void main() {
     expect(jsonDecode(setting.value), {
       'stickers_per_row': 5,
       'include_border': false,
+      'serial_number': '0017',
+      'auto_increment_serial_number': true,
+      'serial_number_increment': 3,
+      'dual_side_codes': false,
+      'auto_date_time': false,
     });
 
     await repository.update('tenant-1', created, {
       'stickers_per_row': 3,
       'include_border': true,
+      'serial_number': '0042',
+      'auto_increment_serial_number': false,
+      'serial_number_increment': 5,
+      'dual_side_codes': true,
+      'auto_date_time': true,
     });
     final restored = (await repository.list('tenant-1')).single;
     expect(restored.stickersPerRow, 3);
     expect(restored.includeBorder, isTrue);
+    expect(restored.serialNumber, '0042');
+    expect(restored.autoIncrementSerialNumber, isFalse);
+    expect(restored.serialNumberIncrement, 5);
+    expect(restored.dualSideCodes, isTrue);
+    expect(restored.autoDateTime, isTrue);
   });
 }

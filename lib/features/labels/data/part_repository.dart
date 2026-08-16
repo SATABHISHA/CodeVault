@@ -35,6 +35,19 @@ bool normalizeIncludeBorder(Object? value) => switch (value) {
   _ => true,
 };
 
+bool normalizePartBool(Object? value, {required bool fallback}) => switch (value) {
+  bool enabled => enabled,
+  num number => number != 0,
+  String text when const {'true', '1', 'on', 'yes'}.contains(text.trim().toLowerCase()) => true,
+  String text when const {'false', '0', 'off', 'no'}.contains(text.trim().toLowerCase()) => false,
+  _ => fallback,
+};
+
+int normalizePositiveIncrement(Object? value) {
+  final parsed = value is num ? value.toInt() : int.tryParse('$value'.trim());
+  return parsed != null && parsed > 0 ? parsed : 1;
+}
+
 typedef LabelProfileDimensions = ({double widthMm, double heightMm});
 
 double? _validLabelDimension(Object? value, double maximum) {
@@ -164,6 +177,29 @@ Map<String, dynamic> normalizePartMutationPayload(Map<String, dynamic> data) {
       data['include_border'],
     );
   }
+  if (data.containsKey('auto_increment_serial_number')) {
+    normalized['auto_increment_serial_number'] = normalizePartBool(
+      data['auto_increment_serial_number'],
+      fallback: false,
+    );
+  }
+  if (data.containsKey('serial_number_increment')) {
+    normalized['serial_number_increment'] = normalizePositiveIncrement(
+      data['serial_number_increment'],
+    );
+  }
+  if (data.containsKey('dual_side_codes')) {
+    normalized['dual_side_codes'] = normalizePartBool(
+      data['dual_side_codes'],
+      fallback: true,
+    );
+  }
+  if (data.containsKey('auto_date_time')) {
+    normalized['auto_date_time'] = normalizePartBool(
+      data['auto_date_time'],
+      fallback: true,
+    );
+  }
   if (data.containsKey('label_layout') ||
       data.containsKey('label_layout_config')) {
     final raw = data['label_layout'] ?? data['label_layout_config'];
@@ -195,6 +231,11 @@ class PartRecord {
     double codeHeightScale = defaultLabelCodeScale,
     int? stickersPerRow,
     this.includeBorder = true,
+    this.serialNumber = '001',
+    this.autoIncrementSerialNumber = false,
+    this.serialNumberIncrement = 1,
+    this.dualSideCodes = true,
+    this.autoDateTime = true,
   }) : labelFieldSettings = LabelFieldConfig.mergeWithDefaults(
          labelFieldSettings,
        ),
@@ -249,6 +290,13 @@ class PartRecord {
       codeHeightScale: normalizeLabelCodeScale(json['code_height_scale']),
       stickersPerRow: normalizeStickersPerRow(json['stickers_per_row']),
       includeBorder: normalizeIncludeBorder(json['include_border']),
+      serialNumber: json['serial_number'] as String? ?? '001',
+      autoIncrementSerialNumber: normalizePartBool(
+        json['auto_increment_serial_number'], fallback: false),
+      serialNumberIncrement: normalizePositiveIncrement(
+        json['serial_number_increment']),
+      dualSideCodes: normalizePartBool(json['dual_side_codes'], fallback: true),
+      autoDateTime: normalizePartBool(json['auto_date_time'], fallback: true),
     );
   }
 
@@ -272,6 +320,11 @@ class PartRecord {
   final double codeHeightScale;
   final int? stickersPerRow;
   final bool includeBorder;
+  final String serialNumber;
+  final bool autoIncrementSerialNumber;
+  final int serialNumberIncrement;
+  final bool dualSideCodes;
+  final bool autoDateTime;
 }
 
 /// Abstract interface — implemented by [CloudPartRepository] (web/mobile) and

@@ -76,6 +76,15 @@ class LocalPartRepository implements PartRepository {
         printPreferences['stickers_per_row'],
       ),
       includeBorder: normalizeIncludeBorder(printPreferences['include_border']),
+      serialNumber: printPreferences['serial_number'] as String? ?? '001',
+      autoIncrementSerialNumber: normalizePartBool(
+        printPreferences['auto_increment_serial_number'], fallback: false),
+      serialNumberIncrement: normalizePositiveIncrement(
+        printPreferences['serial_number_increment']),
+      dualSideCodes: normalizePartBool(
+        printPreferences['dual_side_codes'], fallback: true),
+      autoDateTime: normalizePartBool(
+        printPreferences['auto_date_time'], fallback: true),
     );
   }
 
@@ -208,6 +217,11 @@ class LocalPartRepository implements PartRepository {
     String partId, {
     required Object? stickersPerRow,
     required Object? includeBorder,
+    Object? serialNumber,
+    Object? autoIncrementSerialNumber,
+    Object? serialNumberIncrement,
+    Object? dualSideCodes,
+    Object? autoDateTime,
   }) => _db
       .into(_db.localSettings)
       .insertOnConflictUpdate(
@@ -217,6 +231,13 @@ class LocalPartRepository implements PartRepository {
           value: jsonEncode({
             'stickers_per_row': normalizeStickersPerRow(stickersPerRow),
             'include_border': normalizeIncludeBorder(includeBorder),
+            'serial_number': serialNumber is String ? serialNumber : '001',
+            'auto_increment_serial_number': normalizePartBool(
+              autoIncrementSerialNumber, fallback: false),
+            'serial_number_increment': normalizePositiveIncrement(
+              serialNumberIncrement),
+            'dual_side_codes': normalizePartBool(dualSideCodes, fallback: true),
+            'auto_date_time': normalizePartBool(autoDateTime, fallback: true),
           }),
         ),
       );
@@ -330,6 +351,11 @@ class LocalPartRepository implements PartRepository {
       id,
       stickersPerRow: data['stickers_per_row'],
       includeBorder: data['include_border'],
+      serialNumber: data['serial_number'],
+      autoIncrementSerialNumber: data['auto_increment_serial_number'],
+      serialNumberIncrement: data['serial_number_increment'],
+      dualSideCodes: data['dual_side_codes'],
+      autoDateTime: data['auto_date_time'],
     );
     final row = await (_db.select(
       _db.parts,
@@ -448,13 +474,25 @@ class LocalPartRepository implements PartRepository {
         heightScale: data['code_height_scale'] ?? part.codeHeightScale,
       );
     }
-    if (data.containsKey('stickers_per_row') ||
-        data.containsKey('include_border')) {
+    if (const {
+      'stickers_per_row',
+      'include_border',
+      'serial_number',
+      'auto_increment_serial_number',
+      'serial_number_increment',
+      'dual_side_codes',
+      'auto_date_time',
+    }.any(data.containsKey)) {
       await _savePrintPreferences(
         tenantId,
         part.id,
         stickersPerRow: data['stickers_per_row'] ?? part.stickersPerRow,
         includeBorder: data['include_border'] ?? part.includeBorder,
+        serialNumber: data['serial_number'] ?? part.serialNumber,
+        autoIncrementSerialNumber: data['auto_increment_serial_number'] ?? part.autoIncrementSerialNumber,
+        serialNumberIncrement: data['serial_number_increment'] ?? part.serialNumberIncrement,
+        dualSideCodes: data['dual_side_codes'] ?? part.dualSideCodes,
+        autoDateTime: data['auto_date_time'] ?? part.autoDateTime,
       );
     }
     final row =

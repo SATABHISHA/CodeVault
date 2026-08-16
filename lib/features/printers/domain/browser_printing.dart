@@ -73,6 +73,7 @@ class BrowserLabelDocument {
     this.scanValueSource = 'encoded_text',
     this.encodedDrCode = '',
     this.encodedYearMonth,
+    this.encodedItemModel = '',
     this.autoIncrementPartNumber = false,
     this.partNumberIncrement = 1,
     this.autoIncrementSerialNumber = false,
@@ -107,6 +108,7 @@ class BrowserLabelDocument {
   final String scanValueSource;
   final String encodedDrCode;
   final String? encodedYearMonth;
+  final String encodedItemModel;
   final bool autoIncrementPartNumber;
   final int partNumberIncrement;
   final bool autoIncrementSerialNumber;
@@ -139,6 +141,9 @@ class BrowserLabelDocument {
       'encoded_text'
           when encodedYearMonth != null && (partChanged || serialChanged) =>
         '00$resolvedPartNumber${encodedDrCode}E$encodedYearMonth${resolvedSerialNumber.padLeft(7, '0')}',
+      'new_encoded_qrcode_text'
+          when encodedYearMonth != null && (partChanged || serialChanged) =>
+        '$resolvedPartNumber$encodedDrCode$encodedItemModel${encodedYearMonth!.substring(2)}${encodedYearMonth!.substring(0, 2)}$resolvedSerialNumber',
       _ => content,
     };
     return (

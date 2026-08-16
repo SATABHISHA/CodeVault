@@ -439,8 +439,16 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     return '00${partNumber.text}${dr.text}E$year$month${serial.text.padLeft(7, '0')}';
   }
 
+  String get newEncodedQrCodeText {
+    final now = DateTime.now();
+    final month = now.month.toString().padLeft(2, '0');
+    final year = (now.year % 100).toString().padLeft(2, '0');
+    return '${partNumber.text}${dr.text}${model.text}$month$year${serial.text}';
+  }
+
   Map<String, String> get _scanValueOptions => {
     'encoded_text': 'Encoded text (default)',
+    'new_encoded_qrcode_text': 'New Encoded QRCode Text',
     'part_number': 'Part number',
     'item_name': 'Item name',
     'item_model': 'Item model',
@@ -479,6 +487,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       'company_address' => companyAddress.text,
       'port' => portLabel.text,
       'date_time' => '${labelDate.text} ${labelTime.text}'.trim(),
+      'new_encoded_qrcode_text' => newEncodedQrCodeText,
       _ => codeData,
     };
   }
@@ -2997,6 +3006,11 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     'code_height_scale': codeHeightScale,
     'stickers_per_row': stickersPerRow,
     'include_border': includeBorder,
+    'serial_number': serial.text,
+    'auto_increment_serial_number': autoIncrementSerialNumber,
+    'serial_number_increment': _incrementStep(serialIncrementBy),
+    'dual_side_codes': dualSideCodes,
+    'auto_date_time': autoDateTime,
     'label_company_name': companyName.text.trim(),
     'label_company_address': companyAddress.text.trim(),
     'label_field_config': LabelFieldConfig.toJsonObject(_labelFieldSettings),
@@ -3070,6 +3084,11 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
         part.stickersPerRow ??
         (maxPageWidthMm / part.labelWidthMm).floor().clamp(1, 999);
     includeBorder = part.includeBorder;
+    serial.text = part.serialNumber;
+    autoIncrementSerialNumber = part.autoIncrementSerialNumber;
+    serialIncrementBy.text = part.serialNumberIncrement.toString();
+    dualSideCodes = part.dualSideCodes;
+    autoDateTime = part.autoDateTime;
     _labelFieldSettings = LabelFieldConfig.mergeWithDefaults(
       part.labelFieldSettings,
     );
@@ -3303,6 +3322,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
           : _scanValueSource,
       encodedDrCode: dr.text.trim(),
       encodedYearMonth: encodedYearMonth,
+      encodedItemModel: model.text.trim(),
       autoIncrementPartNumber: autoIncrementPartNumber,
       partNumberIncrement: _incrementStep(partIncrementBy),
       autoIncrementSerialNumber: autoIncrementSerialNumber,
@@ -3495,6 +3515,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     labelSize = _labelSizeName(defaultLabelWidthMm, defaultLabelHeightMm);
     stickersPerRow = maxStickersPerRow.clamp(1, 999);
     includeBorder = true;
+    dualSideCodes = true;
+    autoDateTime = true;
     dr.text = 'NR';
     pack.text = '1';
     quantity.text = '1';

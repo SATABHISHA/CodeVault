@@ -306,6 +306,26 @@ void main() {
     expect(document.stickerValuesAt(4).content, '  custom encoded value  ');
   });
 
+  test('new QR text combines part, DR, model, MMYY and serial', () {
+    const document = BrowserLabelDocument(
+      title: 'Part',
+      content: 'PN10NRMX0826001',
+      widthMm: 100,
+      heightMm: 30,
+      partNumber: 'PN10',
+      serialNumber: '001',
+      scanValueSource: 'new_encoded_qrcode_text',
+      encodedDrCode: 'NR',
+      encodedItemModel: 'MX',
+      encodedYearMonth: '2608',
+      autoIncrementSerialNumber: true,
+      serialNumberIncrement: 2,
+    );
+
+    expect(document.stickerValuesAt(0).content, 'PN10NRMX0826001');
+    expect(document.stickerValuesAt(2).content, 'PN10NRMX0826005');
+  });
+
   test('selected part or serial scan source changes on every label', () {
     const partDocument = BrowserLabelDocument(
       title: 'PART NO: P-007',

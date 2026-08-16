@@ -54,6 +54,13 @@ class WebLocalPartRepository implements PartRepository {
       codeHeightScale: normalizeLabelCodeScale(payload['code_height_scale']),
       stickersPerRow: normalizeStickersPerRow(payload['stickers_per_row']),
       includeBorder: normalizeIncludeBorder(payload['include_border']),
+      serialNumber: payload['serial_number'] as String? ?? '001',
+      autoIncrementSerialNumber: normalizePartBool(
+        payload['auto_increment_serial_number'], fallback: false),
+      serialNumberIncrement: normalizePositiveIncrement(
+        payload['serial_number_increment']),
+      dualSideCodes: normalizePartBool(payload['dual_side_codes'], fallback: true),
+      autoDateTime: normalizePartBool(payload['auto_date_time'], fallback: true),
     );
   }
 
@@ -117,6 +124,13 @@ class WebLocalPartRepository implements PartRepository {
         normalized['stickers_per_row'],
       ),
       'include_border': normalizeIncludeBorder(normalized['include_border']),
+      'serial_number': normalized['serial_number'] ?? '001',
+      'auto_increment_serial_number': normalizePartBool(
+        normalized['auto_increment_serial_number'], fallback: false),
+      'serial_number_increment': normalizePositiveIncrement(
+        normalized['serial_number_increment']),
+      'dual_side_codes': normalizePartBool(normalized['dual_side_codes'], fallback: true),
+      'auto_date_time': normalizePartBool(normalized['auto_date_time'], fallback: true),
     };
 
     final db = _db(tenantId);
@@ -208,6 +222,15 @@ class WebLocalPartRepository implements PartRepository {
     }
     if (normalized.containsKey('include_border')) {
       payload['include_border'] = normalized['include_border'];
+    }
+    for (final key in const [
+      'serial_number',
+      'auto_increment_serial_number',
+      'serial_number_increment',
+      'dual_side_codes',
+      'auto_date_time',
+    ]) {
+      if (normalized.containsKey(key)) payload[key] = normalized[key];
     }
 
     final changed =
