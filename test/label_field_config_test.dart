@@ -3,6 +3,25 @@ import 'package:codevault/features/labels/domain/label_field_config.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('deep black weights survive field configuration persistence', () {
+    for (final weight in [
+      LabelFontWeight.extraBold,
+      LabelFontWeight.extraBlack,
+      LabelFontWeight.ultraBlack,
+    ]) {
+      final original = LabelFieldConfig.defaults();
+      original[LabelFieldKey.model] = original[LabelFieldKey.model]!.copyWith(
+        fontSize: 24,
+        fontWeight: weight,
+      );
+      final restored = LabelFieldConfig.fromEncodedJson(
+        LabelFieldConfig.toEncodedJson(original),
+      );
+      expect(restored[LabelFieldKey.model]!.fontSize, 24);
+      expect(restored[LabelFieldKey.model]!.fontWeight, weight);
+    }
+  });
+
   test('caption defaults preserve the legacy label appearance', () {
     final settings = LabelFieldConfig.defaults();
 

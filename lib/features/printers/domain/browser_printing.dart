@@ -16,6 +16,65 @@ import '../../labels/domain/label_typography.dart';
 /// upward-positive Y axis. Negating the angle preserves the visual direction.
 double pdfRotationFromPreview(double previewRotation) => -previewRotation;
 
+/// PDF fonts only expose normal/bold faces, so the two deepest label weights
+/// use fill-and-stroke rendering to synthesize the same visibly heavier glyphs
+/// shown by the live Flutter preview.
+PdfTextRenderingMode pdfTextRenderingMode(LabelFontWeight weight) =>
+    switch (weight) {
+      LabelFontWeight.extraBlack || LabelFontWeight.ultraBlack =>
+        PdfTextRenderingMode.fillAndStroke,
+      _ => PdfTextRenderingMode.fill,
+    };
+
+double? pdfTextStrokeWidth(LabelFontWeight weight) => switch (weight) {
+  LabelFontWeight.extraBlack => 0.12,
+  LabelFontWeight.ultraBlack => 0.22,
+  _ => null,
+};
+
+/// The PDF package defaults stroked text to a 1 pt outline, which is far too
+/// heavy for small industrial labels. Keep the outline narrow and legible.
+class _ControlledPdfTextStroke extends pw.SingleChildWidget {
+  _ControlledPdfTextStroke({required this.strokeWidth, required pw.Widget child})
+    : super(child: child);
+
+  final double strokeWidth;
+
+  @override
+  void paint(pw.Context context) {
+    super.paint(context);
+    context.canvas
+      ..saveContext()
+      ..setLineWidth(strokeWidth);
+    paintChild(context);
+    context.canvas.restoreContext();
+  }
+}
+
+LabelFieldKey? _fieldKeyForLayoutElement(LabelLayoutElement element) =>
+    switch (element) {
+      LabelLayoutElement.singleCompanyName ||
+      LabelLayoutElement.dualCompanyName => LabelFieldKey.companyName,
+      LabelLayoutElement.singleCompanyAddress => LabelFieldKey.companyAddress,
+      LabelLayoutElement.singlePartNumber ||
+      LabelLayoutElement.dualPartNumber => LabelFieldKey.partNumber,
+      LabelLayoutElement.singleSerialNumber ||
+      LabelLayoutElement.dualSerialNumber => LabelFieldKey.serialNumber,
+      LabelLayoutElement.singleItemName ||
+      LabelLayoutElement.dualItemName => LabelFieldKey.itemName,
+      LabelLayoutElement.singleModel || LabelLayoutElement.dualModel =>
+        LabelFieldKey.model,
+      LabelLayoutElement.singlePort || LabelLayoutElement.dualPort =>
+        LabelFieldKey.port,
+      LabelLayoutElement.singleDate || LabelLayoutElement.dualDate =>
+        LabelFieldKey.date,
+      LabelLayoutElement.singleTime || LabelLayoutElement.dualTime =>
+        LabelFieldKey.time,
+      LabelLayoutElement.singleCodeData ||
+      LabelLayoutElement.dualCodeData => LabelFieldKey.codeData,
+      _ => null,
+    };
+
 double clampLabelCodeDimension({
   required double base,
   required double scale,
@@ -69,6 +128,7 @@ class BrowserLabelDocument {
     this.dynamicFields = const [],
     this.resolvedLayoutRects = const {},
     this.resolvedDynamicRects = const {},
+    this.previewCanvasWidth,
     this.previewCanvasHeight,
     this.scanValueSource = 'encoded_text',
     this.encodedDrCode = '',
@@ -104,6 +164,7 @@ class BrowserLabelDocument {
   final List<DynamicLabelField> dynamicFields;
   final Map<LabelLayoutElement, LabelLayoutRect> resolvedLayoutRects;
   final Map<String, LabelLayoutRect> resolvedDynamicRects;
+  final double? previewCanvasWidth;
   final double? previewCanvasHeight;
   final String scanValueSource;
   final String encodedDrCode;
@@ -200,9 +261,23 @@ class BrowserPdfGenerator {
     );
 
     // Match preview proportions: keep inner canvas relatively large.
-    final pad = (math.min(wPt, hPt) * 0.06).clamp(1.2, 4.0);
-    final innerW = wPt - pad * 2;
-    final innerH = hPt - pad * 2;
+    const previewPadding = 18.0;
+    final hasPreviewCanvas = label.previewCanvasWidth != null &&
+        label.previewCanvasWidth! > 0 &&
+        label.previewCanvasHeight != null &&
+        label.previewCanvasHeight! > 0;
+    final padX = hasPreviewCanvas
+        ? wPt *
+            previewPadding /
+            (label.previewCanvasWidth! + (previewPadding * 2))
+        : (math.min(wPt, hPt) * 0.06).clamp(1.2, 4.0);
+    final padY = hasPreviewCanvas
+        ? hPt *
+            previewPadding /
+            (label.previewCanvasHeight! + (previewPadding * 2))
+        : (math.min(wPt, hPt) * 0.06).clamp(1.2, 4.0);
+    final innerW = wPt - padX * 2;
+    final innerH = hPt - padY * 2;
 
     // ── Dynamic font scaling based on label height ───────────────────────────
     // Scale fonts so they retain the same proportions as the live preview.
@@ -235,7 +310,10 @@ class BrowserPdfGenerator {
       LabelFontWeight.regular || LabelFontWeight.medium => pw.FontWeight.normal,
       LabelFontWeight.semiBold ||
       LabelFontWeight.bold ||
-      LabelFontWeight.black => pw.FontWeight.bold,
+      LabelFontWeight.extraBold ||
+      LabelFontWeight.black ||
+      LabelFontWeight.extraBlack ||
+      LabelFontWeight.ultraBlack => pw.FontWeight.bold,
     };
 
     pw.TextStyle fieldStyle(
@@ -250,6 +328,7 @@ class BrowserPdfGenerator {
       fontWeight: pdfFontWeight(setting(key).fontWeight),
       color: color,
       letterSpacing: letterSpacing,
+      renderingMode: pdfTextRenderingMode(setting(key).fontWeight),
     );
 
     double scaledFont(
@@ -292,7 +371,6 @@ class BrowserPdfGenerator {
     final showModel = visible(LabelFieldKey.model);
     final showPort =
         visible(LabelFieldKey.port) && label.port.trim().isNotEmpty;
-    final showSingleModelPort = showModel || showPort;
     final showDate = visible(LabelFieldKey.date);
     final showTime = visible(LabelFieldKey.time);
     // ── Barcode sizing ───────────────────────────────────────────────────────
@@ -311,6 +389,7 @@ class BrowserPdfGenerator {
       maximum: innerH,
     );
     final singleTextW = math.max(innerW * .50, innerW * .78);
+    final singleCompanyW = innerW * .96;
     final singleFontPeak = [
       fCompany,
       fAddress,
@@ -342,12 +421,29 @@ class BrowserPdfGenerator {
     final dualModelW = centerW * .62;
     final dualPortW = centerW * .34;
 
+    pw.Widget controlledWeight(
+      LabelFontWeight weight,
+      pw.Widget child,
+    ) {
+      final strokeWidth = pdfTextStrokeWidth(weight);
+      return strokeWidth == null
+          ? child
+          : _ControlledPdfTextStroke(
+              strokeWidth: strokeWidth,
+              child: child,
+            );
+    }
+
     pw.Widget positionedElement({
       required LabelLayoutElement element,
       required double width,
       required double height,
       required pw.Widget child,
     }) {
+      final fieldKey = _fieldKeyForLayoutElement(element);
+      final weightedChild = fieldKey == null
+          ? child
+          : controlledWeight(setting(fieldKey).fontWeight, child);
       final rotation = resolvedLayout.positionFor(element).rotation;
       final isBarcode = {
         LabelLayoutElement.singleBarcode,
@@ -361,16 +457,20 @@ class BrowserPdfGenerator {
           }.contains(element)
           ? pw.Alignment.center
           : pw.Alignment.centerLeft;
-      pw.Widget sizedChild(double resolvedWidth, double resolvedHeight) {
+      pw.Widget sizedChild(
+        double resolvedWidth,
+        double resolvedHeight, {
+        required bool usesPreviewGeometry,
+      }) {
         final content = pw.SizedBox(
           width: resolvedWidth,
           height: resolvedHeight,
-          child: isBarcode
-              ? child
+          child: isBarcode || usesPreviewGeometry
+              ? weightedChild
               : pw.FittedBox(
                   fit: pw.BoxFit.scaleDown,
                   alignment: textAlignment,
-                  child: child,
+                  child: weightedChild,
                 ),
         );
         return rotation == 0
@@ -386,7 +486,11 @@ class BrowserPdfGenerator {
         return pw.Positioned(
           left: innerW * rect.left,
           top: innerH * rect.top,
-          child: sizedChild(innerW * rect.width, innerH * rect.height),
+          child: sizedChild(
+            innerW * rect.width,
+            innerH * rect.height,
+            usesPreviewGeometry: true,
+          ),
         );
       }
       final normalized = resolvedLayout.positionFor(element);
@@ -395,7 +499,7 @@ class BrowserPdfGenerator {
       return pw.Positioned(
         left: freeW * normalized.x,
         top: freeH * normalized.y,
-        child: sizedChild(width, height),
+        child: sizedChild(width, height, usesPreviewGeometry: false),
       );
     }
 
@@ -407,6 +511,21 @@ class BrowserPdfGenerator {
       final height = rect == null
           ? (twinCodes ? dualLineH : singleLineH)
           : innerH * rect.height;
+      final text = pw.Text(
+        field.showCaption ? '${field.label}: ${field.value}' : field.value,
+        maxLines: 1,
+        style: pw.TextStyle(
+          font: labelFont,
+          fontStyle: pdfFontStyle(field.fontStyle),
+          fontWeight: pdfFontWeight(field.fontWeight),
+          fontSize: (field.fontSize * fontScale).clamp(
+            0.8,
+            LabelFieldConfig.maxFontSize,
+          ),
+          letterSpacing: LabelTypography.textTracking,
+          renderingMode: pdfTextRenderingMode(field.fontWeight),
+        ),
+      );
       return pw.Positioned(
         left: rect == null ? (innerW - width) * field.x : innerW * rect.left,
         top: rect == null ? (innerH - height) * field.y : innerH * rect.top,
@@ -415,26 +534,13 @@ class BrowserPdfGenerator {
           child: pw.SizedBox(
             width: width,
             height: height,
-            child: pw.FittedBox(
-              fit: pw.BoxFit.scaleDown,
-              alignment: pw.Alignment.centerLeft,
-              child: pw.Text(
-                field.showCaption
-                    ? '${field.label}: ${field.value}'
-                    : field.value,
-                maxLines: 1,
-                style: pw.TextStyle(
-                  font: labelFont,
-                  fontStyle: pdfFontStyle(field.fontStyle),
-                  fontWeight: pdfFontWeight(field.fontWeight),
-                  fontSize: (field.fontSize * fontScale).clamp(
-                    0.8,
-                    LabelFieldConfig.maxFontSize,
-                  ),
-                  letterSpacing: LabelTypography.textTracking,
-                ),
-              ),
-            ),
+            child: rect == null
+                ? pw.FittedBox(
+                    fit: pw.BoxFit.scaleDown,
+                    alignment: pw.Alignment.centerLeft,
+                    child: controlledWeight(field.fontWeight, text),
+                  )
+                : controlledWeight(field.fontWeight, text),
           ),
         ),
       );
@@ -451,7 +557,7 @@ class BrowserPdfGenerator {
         decoration: pw.BoxDecoration(
           border: label.includeBorder ? pw.Border.all(width: 0.4) : null,
         ),
-        padding: pw.EdgeInsets.all(pad),
+        padding: pw.EdgeInsets.symmetric(horizontal: padX, vertical: padY),
         child: pw.Stack(
           children: [
             if (twinCodes) ...[
@@ -644,15 +750,15 @@ class BrowserPdfGenerator {
               if (visible(LabelFieldKey.companyName))
                 positionedElement(
                   element: LabelLayoutElement.singleCompanyName,
-                  width: singleTextW,
-                  height: singleLineH,
+                  width: singleCompanyW,
+                  height: singleLineH * 2,
                   child: pw.Text(
                     fieldText(
                       LabelFieldKey.companyName,
                       'COMPANY',
                       label.company.toUpperCase(),
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: pw.TextOverflow.clip,
                     style: fieldStyle(LabelFieldKey.companyName, fCompany),
                   ),
@@ -708,41 +814,28 @@ class BrowserPdfGenerator {
                     style: fieldStyle(LabelFieldKey.itemName, fItem),
                   ),
                 ),
-              if (showSingleModelPort)
+              if (showModel)
                 positionedElement(
-                  element: LabelLayoutElement.singleModelPort,
+                  element: LabelLayoutElement.singleModel,
                   width: singleTextW,
                   height: singleLineH,
-                  child: pw.RichText(
-                    text: pw.TextSpan(
-                      children: [
-                        if (showModel)
-                          pw.TextSpan(
-                            text: fieldText(
-                              LabelFieldKey.model,
-                              'MODEL',
-                              label.model,
-                            ),
-                            style: fieldStyle(LabelFieldKey.model, fModel),
-                          ),
-                        if (showModel && showPort)
-                          pw.TextSpan(
-                            text: '    ',
-                            style: fieldStyle(LabelFieldKey.model, fModel),
-                          ),
-                        if (showPort)
-                          pw.TextSpan(
-                            text: fieldText(
-                              LabelFieldKey.port,
-                              'PORT',
-                              label.port,
-                            ),
-                            style: fieldStyle(LabelFieldKey.port, fPort),
-                          ),
-                      ],
-                    ),
+                  child: pw.Text(
+                    fieldText(LabelFieldKey.model, 'MODEL', label.model),
                     maxLines: 1,
                     overflow: pw.TextOverflow.clip,
+                    style: fieldStyle(LabelFieldKey.model, fModel),
+                  ),
+                ),
+              if (showPort)
+                positionedElement(
+                  element: LabelLayoutElement.singlePort,
+                  width: singleTextW,
+                  height: singleLineH,
+                  child: pw.Text(
+                    fieldText(LabelFieldKey.port, 'PORT', label.port),
+                    maxLines: 1,
+                    overflow: pw.TextOverflow.clip,
+                    style: fieldStyle(LabelFieldKey.port, fPort),
                   ),
                 ),
               if (visible(LabelFieldKey.serialNumber))

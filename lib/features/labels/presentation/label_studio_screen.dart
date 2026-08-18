@@ -132,6 +132,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
   List<DynamicLabelField> _dynamicFields = const [];
   final Map<LabelLayoutElement, LabelLayoutRect> _previewElementRects = {};
   final Map<String, LabelLayoutRect> _previewDynamicRects = {};
+  double? _previewCanvasWidth;
   double? _previewCanvasHeight;
   String? _selectedPreviewKey;
   String? _activePreviewKey;
@@ -547,25 +548,31 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                 final catalog = _catalog(context);
                 final preview = _preview(context);
                 if (!wide) {
-                  return Column(
-                    children: [
-                      editor,
-                      const SizedBox(height: 16),
-                      catalog,
-                      const SizedBox(height: 16),
-                      preview,
-                    ],
+                  return KeyedSubtree(
+                    key: const ValueKey('stacked-label-studio'),
+                    child: Column(
+                      children: [
+                        editor,
+                        const SizedBox(height: 16),
+                        catalog,
+                        const SizedBox(height: 16),
+                        preview,
+                      ],
+                    ),
                   );
                 }
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(flex: 5, child: editor),
-                    const SizedBox(width: 16),
-                    Expanded(flex: 4, child: catalog),
-                    const SizedBox(width: 16),
-                    Expanded(flex: 5, child: preview),
-                  ],
+                return KeyedSubtree(
+                  key: const ValueKey('wide-label-studio'),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 5, child: editor),
+                      const SizedBox(width: 16),
+                      Expanded(flex: 4, child: catalog),
+                      const SizedBox(width: 16),
+                      Expanded(flex: 5, child: preview),
+                    ],
+                  ),
                 );
               },
             ),
@@ -1054,6 +1061,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                       child: LayoutBuilder(
                         builder: (context, labelConstraints) {
                           _previewCanvasHeight = labelConstraints.maxHeight;
+                          _previewCanvasWidth = labelConstraints.maxWidth;
                           _previewElementRects.clear();
                           _previewDynamicRects.clear();
                           final qrSide = math.min(
@@ -1067,6 +1075,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                             100.0,
                             labelConstraints.maxWidth * .78,
                           );
+                          final singleCompanyWidth =
+                              labelConstraints.maxWidth * .96;
                           final dualCodeWidth = (qrSide * codeWidthScale).clamp(
                             12.0,
                             labelConstraints.maxWidth * .42,
@@ -1339,7 +1349,8 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                     area: area,
                                     element:
                                         LabelLayoutElement.singleCompanyName,
-                                    maxWidth: singleTextWidth,
+                                    maxWidth: singleCompanyWidth,
+                                    maxLines: 2,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
                                     text: _fieldText(
@@ -1418,32 +1429,39 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                       height: 1.1,
                                     ),
                                   ),
-                                if (showModel || showPort)
+                                if (showModel)
                                   _draggablePreviewTextFeature(
                                     area: area,
-                                    element: LabelLayoutElement.singleModelPort,
+                                    element: LabelLayoutElement.singleModel,
                                     maxWidth: singleTextWidth,
                                     onChanged: _setLayoutPosition,
                                     onEnd: _saveLabelLayout,
-                                    text: [
-                                      if (showModel)
-                                        _fieldText(
-                                          LabelFieldKey.model,
-                                          'MODEL',
-                                          model.text,
-                                          emptyValue: '—',
-                                        ),
-                                      if (showPort)
-                                        _fieldText(
-                                          LabelFieldKey.port,
-                                          'PORT',
-                                          portLabel.text,
-                                        ),
-                                    ].join('   '),
+                                    text: _fieldText(
+                                      LabelFieldKey.model,
+                                      'MODEL',
+                                      model.text,
+                                    ),
                                     style: _previewTextStyle(
-                                      showModel
-                                          ? LabelFieldKey.model
-                                          : LabelFieldKey.port,
+                                      LabelFieldKey.model,
+                                      letterSpacing:
+                                          LabelTypography.textTracking,
+                                      height: 1.1,
+                                    ),
+                                  ),
+                                if (showPort)
+                                  _draggablePreviewTextFeature(
+                                    area: area,
+                                    element: LabelLayoutElement.singlePort,
+                                    maxWidth: singleTextWidth,
+                                    onChanged: _setLayoutPosition,
+                                    onEnd: _saveLabelLayout,
+                                    text: _fieldText(
+                                      LabelFieldKey.port,
+                                      'PORT',
+                                      portLabel.text,
+                                    ),
+                                    style: _previewTextStyle(
+                                      LabelFieldKey.port,
                                       letterSpacing:
                                           LabelTypography.textTracking,
                                       height: 1.1,
@@ -1568,6 +1586,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
                                         field.fontStyle,
                                       ),
                                       fontWeight: _previewFontWeight(
+                                        field.fontWeight,
+                                      ),
+                                      shadows: _previewFontShadows(
                                         field.fontWeight,
                                       ),
                                       fontSize: field.fontSize,
@@ -1714,13 +1735,14 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     required String text,
     required TextStyle style,
     required double maxWidth,
+    int maxLines = 1,
   }) {
     final painter = TextPainter(
       text: TextSpan(
         text: text,
         style: DefaultTextStyle.of(context).style.merge(style),
       ),
-      maxLines: 1,
+      maxLines: maxLines,
       textDirection: Directionality.of(context),
       textScaler: MediaQuery.textScalerOf(context),
     )..layout(maxWidth: maxWidth);
@@ -1740,6 +1762,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     required void Function(LabelLayoutElement, LabelLayoutPosition) onChanged,
     required Future<void> Function({bool notify}) onEnd,
     TextAlign textAlign = TextAlign.left,
+    int maxLines = 1,
   }) {
     final suppliedText = switch (child) {
       Text value => value,
@@ -1752,6 +1775,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       text: resolvedText,
       style: resolvedStyle,
       maxWidth: maxWidth,
+      maxLines: maxLines,
     );
     final legacyHeight = element.name.startsWith('dual')
         ? math.max(13.0, area.height * .075)
@@ -1769,7 +1793,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
             suppliedText ??
             Text(
               resolvedText,
-              maxLines: 1,
+              maxLines: maxLines,
               overflow: TextOverflow.clip,
               textAlign: textAlign,
               style: resolvedStyle,
@@ -2234,7 +2258,9 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     LabelFontWeight.medium => FontWeight.w500,
     LabelFontWeight.semiBold => FontWeight.w600,
     LabelFontWeight.bold => FontWeight.w700,
+    LabelFontWeight.extraBold => FontWeight.w800,
     LabelFontWeight.black => FontWeight.w900,
+    LabelFontWeight.extraBlack || LabelFontWeight.ultraBlack => FontWeight.w900,
   };
 
   String _fontStyleLabel(LabelFontStyle style) => switch (style) {
@@ -2247,7 +2273,10 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
     LabelFontWeight.medium => 'Medium',
     LabelFontWeight.semiBold => 'Semi bold',
     LabelFontWeight.bold => 'Bold',
+    LabelFontWeight.extraBold => 'Extra bold',
     LabelFontWeight.black => 'Black',
+    LabelFontWeight.extraBlack => 'Extra black',
+    LabelFontWeight.ultraBlack => 'Ultra black',
   };
 
   TextStyle _previewTextStyle(
@@ -2264,10 +2293,22 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       fontSize: setting.fontSize,
       fontStyle: _previewFontStyle(setting.fontStyle),
       fontWeight: _previewFontWeight(setting.fontWeight),
+      shadows: _previewFontShadows(setting.fontWeight),
       letterSpacing: letterSpacing,
       height: height,
     );
   }
+
+  List<Shadow>? _previewFontShadows(LabelFontWeight weight) => switch (weight) {
+    LabelFontWeight.extraBlack => const [
+      Shadow(color: Colors.black, offset: Offset(0.18, 0)),
+    ],
+    LabelFontWeight.ultraBlack => const [
+      Shadow(color: Colors.black, offset: Offset(-0.22, 0)),
+      Shadow(color: Colors.black, offset: Offset(0.22, 0)),
+    ],
+    _ => null,
+  };
 
   void _setVisibility(LabelFieldKey keyName, bool visible) {
     final current =
@@ -3316,6 +3357,7 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       dynamicFields: _dynamicFields,
       resolvedLayoutRects: Map.of(_previewElementRects),
       resolvedDynamicRects: Map.of(_previewDynamicRects),
+      previewCanvasWidth: _previewCanvasWidth,
       previewCanvasHeight: _previewCanvasHeight,
       scanValueSource: _scanDataUsesEncodedText
           ? 'encoded_text'

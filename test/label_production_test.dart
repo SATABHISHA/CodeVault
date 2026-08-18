@@ -8,6 +8,24 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:pdf/pdf.dart';
 
 void main() {
+  test('deep black weights use stroked PDF glyphs', () {
+    expect(
+      pdfTextRenderingMode(LabelFontWeight.black),
+      PdfTextRenderingMode.fill,
+    );
+    expect(
+      pdfTextRenderingMode(LabelFontWeight.extraBlack),
+      PdfTextRenderingMode.fillAndStroke,
+    );
+    expect(
+      pdfTextRenderingMode(LabelFontWeight.ultraBlack),
+      PdfTextRenderingMode.fillAndStroke,
+    );
+    expect(pdfTextStrokeWidth(LabelFontWeight.black), isNull);
+    expect(pdfTextStrokeWidth(LabelFontWeight.extraBlack), 0.12);
+    expect(pdfTextStrokeWidth(LabelFontWeight.ultraBlack), 0.22);
+  });
+
   test('PDF generator produces Code 128, QR and Data Matrix labels', () async {
     for (final symbology in ['code128', 'qr', 'data_matrix']) {
       final bytes = await const BrowserPdfGenerator().generate(
@@ -161,6 +179,7 @@ void main() {
         symbology: 'data_matrix',
         dualSideCodes: true,
         dynamicFields: fields,
+        previewCanvasWidth: 600,
         previewCanvasHeight: 180,
         resolvedLayoutRects: {
           LabelLayoutElement.dualLeftCode: LabelLayoutRect(

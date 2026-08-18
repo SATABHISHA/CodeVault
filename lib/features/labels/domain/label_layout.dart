@@ -5,6 +5,9 @@ enum LabelLayoutElement {
   singleCompanyAddress,
   singlePartNumber,
   singleItemName,
+  singleModel,
+  singlePort,
+  // Legacy saved-layout key. Model and Port are now independently movable.
   singleModelPort,
   singleDate,
   singleTime,
@@ -109,6 +112,8 @@ class LabelLayout {
       x: 0.02,
       y: 0.38,
     ),
+    LabelLayoutElement.singleModel: const LabelLayoutPosition(x: 0.02, y: 0.38),
+    LabelLayoutElement.singlePort: const LabelLayoutPosition(x: 0.32, y: 0.38),
     // Keep the serial on the right side of the model row so legacy barcode
     // and code-data positions do not need to move when this field is added.
     LabelLayoutElement.singleSerialNumber: const LabelLayoutPosition(
@@ -174,6 +179,14 @@ class LabelLayout {
       ),
       LabelLayoutElement.singleDateTime =>
         positions[LabelLayoutElement.singleDate],
+      LabelLayoutElement.singleModel =>
+        positions[LabelLayoutElement.singleModelPort],
+      LabelLayoutElement.singlePort => _followingTimePosition(
+        positions[LabelLayoutElement.singleModelPort],
+        0.30,
+      ),
+      LabelLayoutElement.singleModelPort =>
+        positions[LabelLayoutElement.singleModel],
       LabelLayoutElement.dualDate => positions[LabelLayoutElement.dualDateTime],
       LabelLayoutElement.dualTime => _followingTimePosition(
         positions[LabelLayoutElement.dualDateTime],
@@ -244,6 +257,7 @@ class LabelLayout {
     final explicitlyRestored = <LabelLayoutElement>{};
     LabelLayoutPosition? legacySingleDateTime;
     LabelLayoutPosition? legacyDualDateTime;
+    LabelLayoutPosition? legacySingleModelPort;
     for (final entry in decoded.entries) {
       final element = LabelLayoutElement.values
           .where((candidate) => candidate.name == entry.key)
@@ -254,6 +268,9 @@ class LabelLayout {
       switch (element) {
         case LabelLayoutElement.singleDateTime:
           legacySingleDateTime = position;
+          break;
+        case LabelLayoutElement.singleModelPort:
+          legacySingleModelPort = position;
           break;
         case LabelLayoutElement.dualDateTime:
           legacyDualDateTime = position;
@@ -287,12 +304,24 @@ class LabelLayout {
         )!;
       }
     }
+    if (legacySingleModelPort != null) {
+      if (!explicitlyRestored.contains(LabelLayoutElement.singleModel)) {
+        resolved[LabelLayoutElement.singleModel] = legacySingleModelPort;
+      }
+      if (!explicitlyRestored.contains(LabelLayoutElement.singlePort)) {
+        resolved[LabelLayoutElement.singlePort] = _followingTimePosition(
+          legacySingleModelPort,
+          0.30,
+        )!;
+      }
+    }
     return LabelLayout(resolved);
   }
 
   static bool _isLegacyDateTimeElement(LabelLayoutElement element) =>
       element == LabelLayoutElement.singleDateTime ||
-      element == LabelLayoutElement.dualDateTime;
+      element == LabelLayoutElement.dualDateTime ||
+      element == LabelLayoutElement.singleModelPort;
 
   static LabelLayoutPosition? _followingTimePosition(
     LabelLayoutPosition? datePosition,

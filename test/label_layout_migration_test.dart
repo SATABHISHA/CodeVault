@@ -4,6 +4,19 @@ import 'package:codevault/features/labels/domain/label_layout.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('legacy combined model and port position migrates independently', () {
+    final layout = LabelLayout.fromEncodedJson(
+      '{"singleModelPort":{"x":0.12,"y":0.34,"rotation":7}}',
+    );
+
+    expect(layout.positionFor(LabelLayoutElement.singleModel).x, 0.12);
+    expect(layout.positionFor(LabelLayoutElement.singlePort).x, 0.42);
+    expect(layout.positionFor(LabelLayoutElement.singlePort).rotation, 7);
+    expect(layout.toEncodedJson(), contains('singleModel'));
+    expect(layout.toEncodedJson(), contains('singlePort'));
+    expect(layout.toEncodedJson(), isNot(contains('singleModelPort')));
+  });
+
   test('default layouts expose independently positioned Date and Time', () {
     final layout = LabelLayout.defaults();
 

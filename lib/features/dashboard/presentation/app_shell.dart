@@ -100,6 +100,7 @@ class AppShell extends ConsumerWidget {
           .indexWhere((item) => item.$3 == location)
           .clamp(0, compactDestinations.length - 1);
       return Scaffold(
+        key: const ValueKey('compact-app-shell'),
         appBar: AppBar(
           title: const Text(BrandConfig.productName),
           actions: [
@@ -129,9 +130,11 @@ class AppShell extends ConsumerWidget {
       );
     }
     return Scaffold(
+      key: ValueKey('rail-app-shell-${size.name}'),
       body: Row(
         children: [
           NavigationRail(
+            key: ValueKey('navigation-rail-${size.name}'),
             extended: size == LayoutSize.expanded,
             selectedIndex: selected,
             onDestinationSelected: (index) =>

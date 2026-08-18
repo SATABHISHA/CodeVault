@@ -19,7 +19,16 @@ enum LabelFieldKey {
 
 enum LabelFontStyle { normal, italic }
 
-enum LabelFontWeight { regular, medium, semiBold, bold, black }
+enum LabelFontWeight {
+  regular,
+  medium,
+  semiBold,
+  bold,
+  extraBold,
+  black,
+  extraBlack,
+  ultraBlack,
+}
 
 class LabelFieldSetting {
   const LabelFieldSetting({

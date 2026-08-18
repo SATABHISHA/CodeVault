@@ -118,15 +118,29 @@ void main() {
       ),
     );
     expect(find.byType(NavigationBar), findsOneWidget);
+
+    // Start a tooltip animation before crossing the responsive boundary. This
+    // guards against reusing TooltipState after the shell changes structure.
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer();
+    await mouse.moveTo(tester.getCenter(find.byTooltip('Logout')));
+    await tester.pump(const Duration(milliseconds: 100));
+
     tester.view.physicalSize = const Size(1200, 800);
-    await tester.pumpWidget(
-      const ProviderScope(
-        child: MaterialApp(
-          home: AppShell(locationOverride: '/dashboard', child: Text('Body')),
-        ),
-      ),
-    );
+    await tester.pump();
     expect(find.byType(NavigationRail), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    tester.view.physicalSize = const Size(800, 800);
+    await tester.pump();
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    tester.view.physicalSize = const Size(400, 800);
+    await tester.pump();
+    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await mouse.removePointer();
     addTearDown(tester.view.resetPhysicalSize);
   });
 }
