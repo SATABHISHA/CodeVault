@@ -21,8 +21,8 @@ double pdfRotationFromPreview(double previewRotation) => -previewRotation;
 /// shown by the live Flutter preview.
 PdfTextRenderingMode pdfTextRenderingMode(LabelFontWeight weight) =>
     switch (weight) {
-      LabelFontWeight.extraBlack || LabelFontWeight.ultraBlack =>
-        PdfTextRenderingMode.fillAndStroke,
+      LabelFontWeight.extraBlack ||
+      LabelFontWeight.ultraBlack => PdfTextRenderingMode.fillAndStroke,
       _ => PdfTextRenderingMode.fill,
     };
 
@@ -35,8 +35,10 @@ double? pdfTextStrokeWidth(LabelFontWeight weight) => switch (weight) {
 /// The PDF package defaults stroked text to a 1 pt outline, which is far too
 /// heavy for small industrial labels. Keep the outline narrow and legible.
 class _ControlledPdfTextStroke extends pw.SingleChildWidget {
-  _ControlledPdfTextStroke({required this.strokeWidth, required pw.Widget child})
-    : super(child: child);
+  _ControlledPdfTextStroke({
+    required this.strokeWidth,
+    required pw.Widget child,
+  }) : super(child: child);
 
   final double strokeWidth;
 
@@ -62,14 +64,14 @@ LabelFieldKey? _fieldKeyForLayoutElement(LabelLayoutElement element) =>
       LabelLayoutElement.dualSerialNumber => LabelFieldKey.serialNumber,
       LabelLayoutElement.singleItemName ||
       LabelLayoutElement.dualItemName => LabelFieldKey.itemName,
-      LabelLayoutElement.singleModel || LabelLayoutElement.dualModel =>
-        LabelFieldKey.model,
-      LabelLayoutElement.singlePort || LabelLayoutElement.dualPort =>
-        LabelFieldKey.port,
-      LabelLayoutElement.singleDate || LabelLayoutElement.dualDate =>
-        LabelFieldKey.date,
-      LabelLayoutElement.singleTime || LabelLayoutElement.dualTime =>
-        LabelFieldKey.time,
+      LabelLayoutElement.singleModel ||
+      LabelLayoutElement.dualModel => LabelFieldKey.model,
+      LabelLayoutElement.singlePort ||
+      LabelLayoutElement.dualPort => LabelFieldKey.port,
+      LabelLayoutElement.singleDate ||
+      LabelLayoutElement.dualDate => LabelFieldKey.date,
+      LabelLayoutElement.singleTime ||
+      LabelLayoutElement.dualTime => LabelFieldKey.time,
       LabelLayoutElement.singleCodeData ||
       LabelLayoutElement.dualCodeData => LabelFieldKey.codeData,
       _ => null,
@@ -262,19 +264,20 @@ class BrowserPdfGenerator {
 
     // Match preview proportions: keep inner canvas relatively large.
     const previewPadding = 18.0;
-    final hasPreviewCanvas = label.previewCanvasWidth != null &&
+    final hasPreviewCanvas =
+        label.previewCanvasWidth != null &&
         label.previewCanvasWidth! > 0 &&
         label.previewCanvasHeight != null &&
         label.previewCanvasHeight! > 0;
     final padX = hasPreviewCanvas
         ? wPt *
-            previewPadding /
-            (label.previewCanvasWidth! + (previewPadding * 2))
+              previewPadding /
+              (label.previewCanvasWidth! + (previewPadding * 2))
         : (math.min(wPt, hPt) * 0.06).clamp(1.2, 4.0);
     final padY = hasPreviewCanvas
         ? hPt *
-            previewPadding /
-            (label.previewCanvasHeight! + (previewPadding * 2))
+              previewPadding /
+              (label.previewCanvasHeight! + (previewPadding * 2))
         : (math.min(wPt, hPt) * 0.06).clamp(1.2, 4.0);
     final innerW = wPt - padX * 2;
     final innerH = hPt - padY * 2;
@@ -421,17 +424,11 @@ class BrowserPdfGenerator {
     final dualModelW = centerW * .62;
     final dualPortW = centerW * .34;
 
-    pw.Widget controlledWeight(
-      LabelFontWeight weight,
-      pw.Widget child,
-    ) {
+    pw.Widget controlledWeight(LabelFontWeight weight, pw.Widget child) {
       final strokeWidth = pdfTextStrokeWidth(weight);
       return strokeWidth == null
           ? child
-          : _ControlledPdfTextStroke(
-              strokeWidth: strokeWidth,
-              child: child,
-            );
+          : _ControlledPdfTextStroke(strokeWidth: strokeWidth, child: child);
     }
 
     pw.Widget positionedElement({
@@ -457,15 +454,14 @@ class BrowserPdfGenerator {
           }.contains(element)
           ? pw.Alignment.center
           : pw.Alignment.centerLeft;
-      pw.Widget sizedChild(
-        double resolvedWidth,
-        double resolvedHeight, {
-        required bool usesPreviewGeometry,
-      }) {
+      pw.Widget sizedChild(double resolvedWidth, double resolvedHeight) {
         final content = pw.SizedBox(
           width: resolvedWidth,
           height: resolvedHeight,
-          child: isBarcode || usesPreviewGeometry
+          // Preview rectangles define the exact placement and available box.
+          // Let PDF text scale down inside that box when its font metrics are
+          // wider than Flutter's metrics; never clip the value.
+          child: isBarcode
               ? weightedChild
               : pw.FittedBox(
                   fit: pw.BoxFit.scaleDown,
@@ -486,11 +482,7 @@ class BrowserPdfGenerator {
         return pw.Positioned(
           left: innerW * rect.left,
           top: innerH * rect.top,
-          child: sizedChild(
-            innerW * rect.width,
-            innerH * rect.height,
-            usesPreviewGeometry: true,
-          ),
+          child: sizedChild(innerW * rect.width, innerH * rect.height),
         );
       }
       final normalized = resolvedLayout.positionFor(element);
@@ -499,7 +491,7 @@ class BrowserPdfGenerator {
       return pw.Positioned(
         left: freeW * normalized.x,
         top: freeH * normalized.y,
-        child: sizedChild(width, height, usesPreviewGeometry: false),
+        child: sizedChild(width, height),
       );
     }
 

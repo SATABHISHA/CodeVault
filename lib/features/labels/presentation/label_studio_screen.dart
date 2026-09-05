@@ -1789,15 +1789,23 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       onEnd: onEnd,
       child: SizedBox.fromSize(
         size: elementSize,
-        child:
-            suppliedText ??
-            Text(
-              resolvedText,
-              maxLines: maxLines,
-              overflow: TextOverflow.clip,
-              textAlign: textAlign,
-              style: resolvedStyle,
-            ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: switch (textAlign) {
+            TextAlign.center => Alignment.center,
+            TextAlign.right || TextAlign.end => Alignment.centerRight,
+            _ => Alignment.centerLeft,
+          },
+          child:
+              suppliedText ??
+              Text(
+                resolvedText,
+                maxLines: maxLines,
+                overflow: TextOverflow.clip,
+                textAlign: textAlign,
+                style: resolvedStyle,
+              ),
+        ),
       ),
     );
   }
@@ -1830,11 +1838,15 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
       onGeometry: onGeometry,
       child: SizedBox.fromSize(
         size: elementSize,
-        child: Text(
-          text,
-          maxLines: 1,
-          overflow: TextOverflow.clip,
-          style: style,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.clip,
+            style: style,
+          ),
         ),
       ),
     );
