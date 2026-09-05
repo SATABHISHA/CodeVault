@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:codevault/core/config/api_environment.dart';
 import 'package:codevault/core/config/brand_config.dart';
 import 'package:codevault/core/layout/breakpoints.dart';

@@ -110,12 +110,44 @@ class _LocalBackupPanelState extends State<LocalBackupPanel> {
   Future<void> _import(RestoreMode mode) async {
     final source = await openFile(
       acceptedTypeGroups: const [
-        XTypeGroup(label: 'CodeVault backup', extensions: ['cvbackup']),
+        XTypeGroup(
+          label: 'CodeVault backup or SQLite database',
+          extensions: ['cvbackup', 'sqlite', 'db'],
+        ),
       ],
     );
     if (source == null) return;
     await _run(() async {
       final value = await _database();
+      final sourceFile = File(source.path);
+      final rawSqlite = switch (path.extension(source.path).toLowerCase()) {
+        '.sqlite' || '.db' => true,
+        _ => false,
+      };
+      if (rawSqlite) {
+        final database = LocalDatabase(value.$1);
+        try {
+          final report = mode == RestoreMode.replace
+              ? (await service.replaceSqlite(
+                  source: sourceFile,
+                  currentDatabase: value.$2,
+                  target: database,
+                  targetCompanyId: value.$1,
+                )).$2
+              : await service.mergeSqlite(
+                  source: sourceFile,
+                  target: database,
+                  targetCompanyId: value.$1,
+                );
+          notifyBackupImported();
+          final total = report.values.fold<int>(0, (a, b) => a + b);
+          return mode == RestoreMode.replace
+              ? 'SQLite import replaced company data: $total records imported safely.'
+              : 'SQLite import complete: $total new records; existing records kept.';
+        } finally {
+          await database.close();
+        }
+      }
       final manifest = await service.verify(File(source.path));
       final foreignCompany = manifest.companyId != value.$1;
       if (!foreignCompany &&

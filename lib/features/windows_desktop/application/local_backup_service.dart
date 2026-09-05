@@ -113,6 +113,104 @@ class LocalBackupService {
     );
   }
 
+  /// Imports a client-provided raw SQLite database by staging it as a normal
+  /// verified CodeVault backup. The source file is never modified.
+  Future<Map<String, int>> mergeSqlite({
+    required File source,
+    required LocalDatabase target,
+    required String targetCompanyId,
+    bool replaceExisting = false,
+  }) async {
+    final staged = await _stageSqliteAsBackup(source, target);
+    try {
+      return await merge(
+        source: staged.$1,
+        target: target,
+        targetCompanyId: targetCompanyId,
+        replaceExisting: replaceExisting,
+      );
+    } finally {
+      if (await staged.$1.exists()) await staged.$1.delete();
+    }
+  }
+
+  Future<(File, Map<String, int>)> replaceSqlite({
+    required File source,
+    required File currentDatabase,
+    required LocalDatabase target,
+    required String targetCompanyId,
+  }) async {
+    final staged = await _stageSqliteAsBackup(source, target);
+    try {
+      return await replaceCompanyData(
+        source: staged.$1,
+        currentDatabase: currentDatabase,
+        target: target,
+        targetCompanyId: targetCompanyId,
+      );
+    } finally {
+      if (await staged.$1.exists()) await staged.$1.delete();
+    }
+  }
+
+  Future<(File, BackupManifest)> _stageSqliteAsBackup(
+    File source,
+    LocalDatabase target,
+  ) async {
+    if (!await source.exists()) {
+      throw const FormatException('SQLite file was not found.');
+    }
+    final bytes = await source.readAsBytes();
+    if (bytes.length < 16 ||
+        String.fromCharCodes(bytes.take(15)) != 'SQLite format 3') {
+      throw const FormatException(
+        'The selected file is not a SQLite 3 database.',
+      );
+    }
+    final escaped = source.path.replaceAll("'", "''");
+    String? companyId;
+    try {
+      await target.customStatement(
+        "ATTACH DATABASE '$escaped' AS imported_client",
+      );
+      final row = await target
+          .customSelect('SELECT id FROM imported_client.companies LIMIT 1')
+          .getSingleOrNull();
+      companyId = row?.read<String>('id');
+      await target.customStatement('DETACH DATABASE imported_client');
+    } catch (_) {
+      try {
+        await target.customStatement('DETACH DATABASE imported_client');
+      } catch (_) {}
+      rethrow;
+    }
+    final importedCompanyId = companyId;
+    if (importedCompanyId == null || importedCompanyId.trim().isEmpty) {
+      throw const FormatException(
+        'SQLite database does not contain a company record.',
+      );
+    }
+    final manifest = BackupManifest(
+      companyId: importedCompanyId,
+      schemaVersion: 2,
+      createdAt: DateTime.now(),
+      databaseSha256: await _sha256(bytes),
+    );
+    final archive = Archive()
+      ..addFile(ArchiveFile.bytes('database/codevault.sqlite', bytes))
+      ..addFile(
+        ArchiveFile.string('manifest.json', jsonEncode(manifest.toJson())),
+      );
+    final staged = File(
+      path.join(
+        Directory.systemTemp.path,
+        'codevault-client-${const Uuid().v4()}.cvbackup',
+      ),
+    );
+    await staged.writeAsBytes(ZipEncoder().encode(archive), flush: true);
+    return (staged, manifest);
+  }
+
   Future<Map<String, int>> merge({
     required File source,
     required LocalDatabase target,
