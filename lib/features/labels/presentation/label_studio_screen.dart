@@ -543,34 +543,18 @@ class _LabelStudioScreenState extends ConsumerState<LabelStudioScreen> {
           sliver: SliverToBoxAdapter(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final wide = constraints.maxWidth >= 1050;
                 final editor = _editor(context);
                 final catalog = _catalog(context);
                 final preview = _preview(context);
-                if (!wide) {
-                  return KeyedSubtree(
-                    key: const ValueKey('stacked-label-studio'),
-                    child: Column(
-                      children: [
-                        editor,
-                        const SizedBox(height: 16),
-                        catalog,
-                        const SizedBox(height: 16),
-                        preview,
-                      ],
-                    ),
-                  );
-                }
                 return KeyedSubtree(
-                  key: const ValueKey('wide-label-studio'),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  key: const ValueKey('stacked-label-studio'),
+                  child: Column(
                     children: [
-                      Expanded(flex: 5, child: editor),
-                      const SizedBox(width: 16),
-                      Expanded(flex: 4, child: catalog),
-                      const SizedBox(width: 16),
-                      Expanded(flex: 5, child: preview),
+                      editor,
+                      const SizedBox(height: 16),
+                      catalog,
+                      const SizedBox(height: 16),
+                      preview,
                     ],
                   ),
                 );
